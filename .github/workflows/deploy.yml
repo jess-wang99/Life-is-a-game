@@ -1,22 +1,23 @@
-name: Deploy Game Life Manager
 on:
   push:
     branches: [main]
 
+# 关键：添加完整的权限配置
+permissions:
+  contents: write  # 允许推送到仓库
+  pages: write
+  id-token: write
+
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
-          cache: 'npm'
-
-      - name: 清理缓存
-        run: npm cache clean --force
+          node-version: '18'
 
       - name: 安装依赖
         run: npm install
@@ -24,7 +25,7 @@ jobs:
       - name: 构建项目
         run: npm run build
 
-      - name: 部署
+      - name: 部署到 GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

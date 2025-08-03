@@ -4,26 +4,6 @@ import { Line } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
 import Particles from 'react-tsparticles';
 import { loadFull } from 'tsparticles';
-// 引入Firebase
-import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onValue, set, update, remove } from "firebase/database";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
-
-// Firebase配置 - 请替换为你自己的Firebase项目配置
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
-
-// 初始化Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getDatabase(app);
 
 // 注册Chart.js组件
 Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
@@ -51,83 +31,36 @@ const TASK_CATEGORIES = [
 // 页面组件
 const Home = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
   
-  // 数据状态
+  // 从localStorage获取数据用于展示统计
   const [stats, setStats] = useState({
     totalTasks: 0,
     completedTasks: 0,
     totalExp: 0,
     level: 1
   });
-  const [tasks, setTasks] = useState([]);
-  const [todayTasks, setTodayTasks] = useState([]);
-  const [points, setPoints] = useState(0);
   
+  // 获取今日任务
+  const [todayTasks, setTodayTasks] = useState([]);
   const today = getToday();
   
-  // 处理用户认证
   useEffect(() => {
-    // 匿名登录
-    signInAnonymously(auth)
-      .catch((error) => {
-        console.error("Authentication error:", error);
-      });
-      
-    // 监听用户状态变化
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUser(user);
-        // 用户登录后加载数据
-        loadUserData(user.uid);
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
+    const tasks = JSON.parse(localStorage.getItem('lifeGameTasks') || '[]');
+    const completedTasks = tasks.filter(task => task.completed).length;
+    const totalExp = tasks
+      .filter(task => task.completed)
+      .reduce((sum, task) => sum + task.exp, 0);
+    const level = Math.floor(totalExp / 1000) + 1;
+    
+    setStats({
+      totalTasks: tasks.length,
+      completedTasks,
+      totalExp,
+      level
     });
     
-    return () => unsubscribe();
-  }, []);
-  
-  // 从Firebase加载用户数据
-  const loadUserData = (userId) => {
-    // 加载任务
-    const tasksRef = ref(db, `users/${userId}/tasks`);
-    onValue(tasksRef, (snapshot) => {
-      const data = snapshot.val();
-      const taskList = data ? Object.values(data) : [];
-      setTasks(taskList);
-      
-      // 计算统计数据
-      const completedTasks = taskList.filter(task => task.completed).length;
-      const totalExp = taskList
-        .filter(task => task.completed)
-        .reduce((sum, task) => sum + task.exp, 0);
-      const level = Math.floor(totalExp / 1000) + 1;
-      
-      setStats({
-        totalTasks: taskList.length,
-        completedTasks,
-        totalExp,
-        level
-      });
-      
-      // 筛选今日任务
-      filterTodayTasks(taskList);
-    });
-    
-    // 加载积分
-    const pointsRef = ref(db, `users/${userId}/points`);
-    onValue(pointsRef, (snapshot) => {
-      const data = snapshot.val();
-      setPoints(data || 0);
-    });
-  };
-  
-  // 筛选今日任务
-  const filterTodayTasks = (taskList) => {
-    const filtered = taskList.filter(task => {
+    // 筛选今日任务
+    const filtered = tasks.filter(task => {
       const taskDate = new Date(task.specificDate || task.startDate);
       const taskFormatted = formatDate(taskDate);
       
@@ -172,44 +105,71 @@ const Home = () => {
     });
     
     setTodayTasks(filtered);
-  };
+  }, [today]);
   
-  // 切换任务完成状态（同步到Firebase）
-  const toggleTask = (id) => {
-    if (!user) return;
-    
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    
-    const newCompletedState = !task.completed;
-    let pointsToAdd = newCompletedState ? task.points : -task.points;
-    
-    // 更新任务状态
-    const taskRef = ref(db, `users/${user.uid}/tasks/${id}`);
-    update(taskRef, { completed: newCompletedState });
-    
-    // 更新积分
-    const newPoints = points + pointsToAdd;
-    const pointsRef = ref(db, `users/${user.uid}/points`);
-    set(pointsRef, newPoints);
-  };
-
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6 text-center">
-        <div className="text-4xl mt-10">
-          <i className="fa fa-circle-o-notch fa-spin"></i>
-        </div>
-        <p className="mt-4">正在同步数据...</p>
-      </div>
-    );
-  }
-
   // 计算今日任务完成情况
   const todayCompleted = todayTasks.filter(task => task.completed).length;
   const todayCompletionRate = todayTasks.length > 0 
     ? Math.round((todayCompleted / todayTasks.length) * 100) 
     : 0;
+  
+  // 切换任务完成状态
+  const toggleTask = (id) => {
+    const tasks = JSON.parse(localStorage.getItem('lifeGameTasks') || '[]');
+    let updatedTasks = [];
+    let pointsToAdd = 0;
+    
+    // 修复语法错误：将updated改为for
+    for (const task of tasks) {
+      if (task.id === id && !task.completed) {
+        pointsToAdd = task.points;
+        updatedTasks.push({ ...task, completed: true });
+      } else if (task.id === id && task.completed) {
+        // 取消完成时扣除积分
+        pointsToAdd = -task.points;
+        updatedTasks.push({ ...task, completed: false });
+      } else {
+        updatedTasks.push(task);
+      }
+    }
+    
+    // 更新任务
+    localStorage.setItem('lifeGameTasks', JSON.stringify(updatedTasks));
+    setTodayTasks(updatedTasks.filter(task => {
+      // 重新筛选今日任务
+      const taskDate = new Date(task.specificDate || task.startDate);
+      const taskFormatted = formatDate(taskDate);
+      
+      if (task.repeat === 'once' && taskFormatted === today) return true;
+      if (task.repeat === 'daily') {
+        const start = new Date(task.startDate);
+        const end = new Date(task.endDate);
+        const now = new Date(today);
+        return now >= start && now <= end;
+      }
+      if (task.repeat === 'weekly') {
+        const start = new Date(task.startDate);
+        const end = new Date(task.endDate);
+        const now = new Date(today);
+        if (now < start || now > end) return false;
+        return new Date(task.startDate).getDay() === now.getDay();
+      }
+      if (task.repeat === 'monthly') {
+        const start = new Date(task.startDate);
+        const end = new Date(task.endDate);
+        const now = new Date(today);
+        if (now < start || now > end) return false;
+        return new Date(task.startDate).getDate() === now.getDate();
+      }
+      return false;
+    }));
+    
+    // 更新积分
+    if (pointsToAdd !== 0) {
+      const currentPoints = parseInt(localStorage.getItem('lifeGamePoints') || '0');
+      localStorage.setItem('lifeGamePoints', (currentPoints + pointsToAdd).toString());
+    }
+  };
 
   return (
     <div className="container mx-auto p-6">
@@ -355,9 +315,11 @@ const Home = () => {
 };
 
 const Tasks = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [tasks, setTasks] = useState([]);
+  // 任务状态管理
+  const [tasks, setTasks] = useState(() => {
+    const saved = localStorage.getItem('lifeGameTasks');
+    return saved ? JSON.parse(saved) : [];
+  });
   const today = getToday();
   const [activeCategory, setActiveCategory] = useState('all');
   const [editingTask, setEditingTask] = useState(null);
@@ -373,31 +335,10 @@ const Tasks = () => {
     specificDate: today
   });
 
-  // 处理用户认证
+  // 保存任务到localStorage
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUser(user);
-        // 加载任务数据
-        loadTasks(user.uid);
-      } else {
-        setUser(null);
-        setTasks([]);
-      }
-      setLoading(false);
-    });
-    
-    return () => unsubscribe();
-  }, []);
-  
-  // 从Firebase加载任务
-  const loadTasks = (userId) => {
-    const tasksRef = ref(db, `users/${userId}/tasks`);
-    onValue(tasksRef, (snapshot) => {
-      const data = snapshot.val();
-      setTasks(data ? Object.values(data) : []);
-    });
-  };
+    localStorage.setItem('lifeGameTasks', JSON.stringify(tasks));
+  }, [tasks]);
 
   // 处理任务表单变化
   const handleFormChange = (e) => {
@@ -405,14 +346,13 @@ const Tasks = () => {
     setTaskForm(prev => ({ ...prev, [name]: value }));
   };
 
-  // 添加新任务（同步到Firebase）
+  // 添加新任务
   const addTask = () => {
-    if (!taskForm.title.trim() || !user) return;
+    if (!taskForm.title.trim()) return;
     
     const expMap = { easy: 30, medium: 50, hard: 100 };
-    const taskId = Date.now().toString();
     const newTask = {
-      id: taskId,
+      id: Date.now(),
       title: taskForm.title,
       category: taskForm.category,
       difficulty: taskForm.difficulty,
@@ -422,14 +362,11 @@ const Tasks = () => {
       specificDate: taskForm.specificDate,
       completed: false,
       exp: expMap[taskForm.difficulty],
-      points: Math.round(expMap[taskForm.difficulty] / 3), // 积分 = 经验值 / 3
+      points: expMap[taskForm.difficulty] / 3, // 积分 = 经验值 / 3
       createdAt: today
     };
     
-    // 保存到Firebase
-    const taskRef = ref(db, `users/${user.uid}/tasks/${taskId}`);
-    set(taskRef, newTask);
-    
+    setTasks(prev => [...prev, newTask]);
     // 重置表单
     setTaskForm(prev => ({
       ...prev,
@@ -454,26 +391,28 @@ const Tasks = () => {
     document.getElementById('add-task').scrollIntoView({ behavior: 'smooth' });
   };
 
-  // 保存编辑（同步到Firebase）
+  // 保存编辑
   const saveEditing = (id) => {
-    if (!taskForm.title.trim() || !user) return;
+    if (!taskForm.title.trim()) return;
     
     const expMap = { easy: 30, medium: 50, hard: 100 };
-    const updatedTask = {
-      title: taskForm.title,
-      category: taskForm.category,
-      difficulty: taskForm.difficulty,
-      repeat: taskForm.repeat,
-      startDate: taskForm.startDate,
-      endDate: taskForm.endDate,
-      specificDate: taskForm.specificDate,
-      exp: expMap[taskForm.difficulty],
-      points: Math.round(expMap[taskForm.difficulty] / 3)
-    };
-    
-    // 更新到Firebase
-    const taskRef = ref(db, `users/${user.uid}/tasks/${id}`);
-    update(taskRef, updatedTask);
+    setTasks(tasks.map(task => {
+      if (task.id === id) {
+        return {
+          ...task,
+          title: taskForm.title,
+          category: taskForm.category,
+          difficulty: taskForm.difficulty,
+          repeat: taskForm.repeat,
+          startDate: taskForm.startDate,
+          endDate: taskForm.endDate,
+          specificDate: taskForm.specificDate,
+          exp: expMap[taskForm.difficulty],
+          points: expMap[taskForm.difficulty] / 3
+        };
+      }
+      return task;
+    }));
     
     setEditingTask(null);
     setTaskForm(prev => ({
@@ -491,48 +430,38 @@ const Tasks = () => {
     }));
   };
 
-  // 切换任务完成状态（同步到Firebase）
+  // 切换任务完成状态
   const toggleTask = (id) => {
-    if (!user) return;
-    
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    
-    const taskRef = ref(db, `users/${user.uid}/tasks/${id}`);
-    update(taskRef, { completed: !task.completed });
-    
-    // 更新积分
-    const pointsRef = ref(db, `users/${user.uid}/points`);
-    onValue(pointsRef, (snapshot) => {
-      const currentPoints = snapshot.val() || 0;
-      const pointsToAdd = !task.completed ? task.points : -task.points;
-      set(pointsRef, currentPoints + pointsToAdd);
-    }, { once: true });
+    setTasks(tasks.map(task => {
+      if (task.id === id && !task.completed) {
+        // 完成任务时增加积分
+        addPoints(task.points);
+      } else if (task.id === id && task.completed) {
+        // 取消完成时扣除积分
+        addPoints(-task.points);
+      }
+      return task.id === id ? { ...task, completed: !task.completed } : task;
+    }));
   };
 
-  // 删除任务（从Firebase删除）
+  // 增加积分
+  const addPoints = (amount) => {
+    const currentPoints = parseInt(localStorage.getItem('lifeGamePoints') || '0');
+    const newPoints = currentPoints + amount;
+    localStorage.setItem('lifeGamePoints', newPoints.toString());
+  };
+
+  // 删除任务
   const deleteTask = (id) => {
-    if (!user || !window.confirm('确定要删除这个任务吗？')) return;
-    
-    const taskRef = ref(db, `users/${user.uid}/tasks/${id}`);
-    remove(taskRef);
+    if (window.confirm('确定要删除这个任务吗？')) {
+      setTasks(tasks.filter(task => task.id !== id));
+    }
   };
 
   // 筛选任务
   const filteredTasks = activeCategory === 'all' 
     ? tasks 
     : tasks.filter(task => task.category === activeCategory);
-
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6 text-center">
-        <div className="text-4xl mt-10">
-          <i className="fa fa-circle-o-notch fa-spin"></i>
-        </div>
-        <p className="mt-4">正在加载任务...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto p-6">
@@ -803,30 +732,11 @@ const Tasks = () => {
 };
 
 const Achievements = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [tasks, setTasks] = useState([]);
-  
-  // 处理用户认证
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUser(user);
-        // 加载任务数据
-        const tasksRef = ref(db, `users/${user.uid}/tasks`);
-        onValue(tasksRef, (snapshot) => {
-          const data = snapshot.val();
-          setTasks(data ? Object.values(data) : []);
-        });
-      } else {
-        setUser(null);
-        setTasks([]);
-      }
-      setLoading(false);
-    });
-    
-    return () => unsubscribe();
-  }, []);
+  // 从localStorage获取任务数据用于计算成就
+  const [tasks] = useState(() => {
+    const saved = localStorage.getItem('lifeGameTasks');
+    return saved ? JSON.parse(saved) : [];
+  });
   
   // 计算分类任务完成数
   const getCategoryCompletedCount = (categoryId) => {
@@ -965,17 +875,6 @@ const Achievements = () => {
       ? achievements.filter(a => a.unlocked)
       : achievements.filter(a => a.category === activeFilter);
 
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6 text-center">
-        <div className="text-4xl mt-10">
-          <i className="fa fa-circle-o-notch fa-spin"></i>
-        </div>
-        <p className="mt-4">正在加载成就...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto p-6">
       <h2 className="text-3xl font-bold mb-6 flex items-center">
@@ -1071,30 +970,11 @@ const Achievements = () => {
 };
 
 const Stats = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [tasks, setTasks] = useState([]);
-
-  // 处理用户认证
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUser(user);
-        // 加载任务数据
-        const tasksRef = ref(db, `users/${user.uid}/tasks`);
-        onValue(tasksRef, (snapshot) => {
-          const data = snapshot.val();
-          setTasks(data ? Object.values(data) : []);
-        });
-      } else {
-        setUser(null);
-        setTasks([]);
-      }
-      setLoading(false);
-    });
-    
-    return () => unsubscribe();
-  }, []);
+  // 从localStorage获取任务数据
+  const [tasks] = useState(() => {
+    const saved = localStorage.getItem('lifeGameTasks');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // 计算统计数据
   const totalTasks = tasks.length;
@@ -1162,17 +1042,6 @@ const Stats = () => {
       }
     ],
   };
-
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6 text-center">
-        <div className="text-4xl mt-10">
-          <i className="fa fa-circle-o-notch fa-spin"></i>
-        </div>
-        <p className="mt-4">正在加载统计数据...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto p-6">
@@ -1268,40 +1137,20 @@ const Stats = () => {
 
 // 抽奖系统
 const Lottery = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [points, setPoints] = useState(0);
+  const [points, setPoints] = useState(() => {
+    return parseInt(localStorage.getItem('lifeGamePoints') || '0');
+  });
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState(null);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState(() => {
+    const saved = localStorage.getItem('lifeGameLotteryHistory');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  // 处理用户认证和数据加载
+  // 保存历史记录
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUser(user);
-        // 加载积分
-        const pointsRef = ref(db, `users/${user.uid}/points`);
-        onValue(pointsRef, (snapshot) => {
-          setPoints(snapshot.val() || 0);
-        });
-        
-        // 加载抽奖历史
-        const lotteryRef = ref(db, `users/${user.uid}/lotteryHistory`);
-        onValue(lotteryRef, (snapshot) => {
-          const data = snapshot.val();
-          setHistory(data ? Object.values(data) : []);
-        });
-      } else {
-        setUser(null);
-        setPoints(0);
-        setHistory([]);
-      }
-      setLoading(false);
-    });
-    
-    return () => unsubscribe();
-  }, []);
+    localStorage.setItem('lifeGameLotteryHistory', JSON.stringify(history));
+  }, [history]);
 
   // 抽奖奖品配置
   const prizes = [
@@ -1312,10 +1161,8 @@ const Lottery = () => {
     { id: 5, name: "心愿兑换券", value: 1, type: "wish", probability: 5, icon: "gift", color: "purple" }
   ];
 
-  // 开始抽奖（同步到Firebase）
+  // 开始抽奖
   const startLottery = () => {
-    if (!user) return;
-    
     // 检查积分是否足够
     if (points < 20) {
       alert("积分不足！每次抽奖需要20积分");
@@ -1324,8 +1171,8 @@ const Lottery = () => {
     
     // 扣除积分
     const newPoints = points - 20;
-    const pointsRef = ref(db, `users/${user.uid}/points`);
-    set(pointsRef, newPoints);
+    setPoints(newPoints);
+    localStorage.setItem('lifeGamePoints', newPoints.toString());
     
     // 开始旋转动画
     setIsSpinning(true);
@@ -1350,37 +1197,27 @@ const Lottery = () => {
       if (winningPrize) {
         setResult(winningPrize);
         
-        // 记录历史到Firebase
-        const historyId = Date.now().toString();
-        const historyRef = ref(db, `users/${user.uid}/lotteryHistory/${historyId}`);
-        set(historyRef, {
-          id: historyId,
-          prize: winningPrize,
-          date: new Date().toLocaleString(),
-          used: false
-        });
+        // 记录历史
+        setHistory(prev => [
+          {
+            id: Date.now(),
+            prize: winningPrize,
+            date: new Date().toLocaleString()
+          },
+          ...prev.slice(0, 9) // 只保留最近10条记录
+        ]);
         
         // 如果中奖的是积分，增加积分
         if (winningPrize.type !== "wish" && winningPrize.value > 0) {
           const updatedPoints = newPoints + winningPrize.value;
-          set(pointsRef, updatedPoints);
+          setPoints(updatedPoints);
+          localStorage.setItem('lifeGamePoints', updatedPoints.toString());
         }
       }
       
       setIsSpinning(false);
     }, 3000);
   };
-
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6 text-center">
-        <div className="text-4xl mt-10">
-          <i className="fa fa-circle-o-notch fa-spin"></i>
-        </div>
-        <p className="mt-4">正在加载抽奖系统...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto p-6">
@@ -1472,7 +1309,7 @@ const Lottery = () => {
               </div>
             ) : (
               <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
-                {history.slice(0, 10).map(item => (
+                {history.map(item => (
                   <div key={item.id} className="p-3 bg-gray-700 rounded-lg">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
@@ -1494,123 +1331,75 @@ const Lottery = () => {
 
 // 心愿清单
 const Wishes = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [wishes, setWishes] = useState([]);
+  const [wishes, setWishes] = useState(() => {
+    const saved = localStorage.getItem('lifeGameWishes');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [newWish, setNewWish] = useState('');
   const [wishPoints, setWishPoints] = useState(0);
   const [wishTickets, setWishTickets] = useState(0);
 
-  // 处理用户认证和数据加载
+  // 加载积分和心愿券数量
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUser(user);
-        // 加载心愿
-        const wishesRef = ref(db, `users/${user.uid}/wishes`);
-        onValue(wishesRef, (snapshot) => {
-          const data = snapshot.val();
-          setWishes(data ? Object.values(data) : []);
-        });
-        
-        // 加载积分
-        const pointsRef = ref(db, `users/${user.uid}/points`);
-        onValue(pointsRef, (snapshot) => {
-          setWishPoints(snapshot.val() || 0);
-        });
-        
-        // 计算心愿券数量
-        const lotteryRef = ref(db, `users/${user.uid}/lotteryHistory`);
-        onValue(lotteryRef, (snapshot) => {
-          const data = snapshot.val();
-          if (data) {
-            const tickets = Object.values(data)
-              .filter(item => item.prize.type === 'wish' && item.used !== true)
-              .length;
-            setWishTickets(tickets);
-          }
-        });
-      } else {
-        setUser(null);
-        setWishes([]);
-        setWishPoints(0);
-        setWishTickets(0);
-      }
-      setLoading(false);
-    });
+    const points = parseInt(localStorage.getItem('lifeGamePoints') || '0');
+    setWishPoints(points);
     
-    return () => unsubscribe();
+    // 计算心愿券数量（从抽奖历史中统计）
+    const lotteryHistory = JSON.parse(localStorage.getItem('lifeGameLotteryHistory') || '[]');
+    const availableTickets = lotteryHistory.filter(item => item.prize.type === 'wish' && item.used !== true).length;
+    setWishTickets(availableTickets);
   }, []);
 
-  // 添加新心愿（同步到Firebase）
+  // 保存心愿到localStorage
+  useEffect(() => {
+    localStorage.setItem('lifeGameWishes', JSON.stringify(wishes));
+  }, [wishes]);
+
+  // 添加新心愿
   const addWish = () => {
-    if (!newWish.trim() || !user) return;
+    if (!newWish.trim()) return;
     
-    const wishId = Date.now().toString();
-    const newWishItem = {
-      id: wishId,
-      title: newWish,
-      status: 'pending', // pending, in_progress, completed
-      points: 0,
-      createdAt: new Date().toLocaleString()
-    };
-    
-    // 保存到Firebase
-    const wishRef = ref(db, `users/${user.uid}/wishes/${wishId}`);
-    set(wishRef, newWishItem);
+    setWishes(prev => [
+      ...prev,
+      {
+        id: Date.now(),
+        title: newWish,
+        status: 'pending', // pending, in_progress, completed
+        points: 0,
+        createdAt: new Date().toLocaleString()
+      }
+    ]);
     
     setNewWish('');
   };
 
   // 兑换心愿（使用心愿券）
   const redeemWish = (id) => {
-    if (!user || wishTickets < 1) {
+    if (wishTickets < 1) {
       alert("没有足够的心愿兑换券！可以通过抽奖获得。");
       return;
     }
     
     // 更新心愿状态
-    const wishRef = ref(db, `users/${user.uid}/wishes/${id}`);
-    update(wishRef, { status: 'completed' });
+    setWishes(prev => prev.map(wish => 
+      wish.id === id ? { ...wish, status: 'completed' } : wish
+    ));
     
     // 减少心愿券数量（更新抽奖历史）
-    const lotteryRef = ref(db, `users/${user.uid}/lotteryHistory`);
-    onValue(lotteryRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        // 找到第一个未使用的心愿券
-        const entries = Object.entries(data);
-        const firstTicket = entries.find(([key, value]) => 
-          value.prize.type === 'wish' && value.used !== true
-        );
-        
-        if (firstTicket) {
-          const [ticketId] = firstTicket;
-          const ticketRef = ref(db, `users/${user.uid}/lotteryHistory/${ticketId}`);
-          update(ticketRef, { used: true });
-        }
-      }
-    }, { once: true });
+    const lotteryHistory = JSON.parse(localStorage.getItem('lifeGameLotteryHistory') || '[]');
+    // 找到第一个未使用的心愿券并标记为已使用
+    const firstTicketIndex = lotteryHistory.findIndex(item => item.prize.type === 'wish' && item.used !== true);
+    if (firstTicketIndex !== -1) {
+      lotteryHistory[firstTicketIndex].used = true;
+      localStorage.setItem('lifeGameLotteryHistory', JSON.stringify(lotteryHistory));
+      setWishTickets(wishTickets - 1);
+    }
   };
 
-  // 删除心愿（从Firebase删除）
+  // 删除心愿
   const deleteWish = (id) => {
-    if (!user || !window.confirm('确定要删除这个心愿吗？')) return;
-    
-    const wishRef = ref(db, `users/${user.uid}/wishes/${id}`);
-    remove(wishRef);
+    setWishes(prev => prev.filter(wish => wish.id !== id));
   };
-
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6 text-center">
-        <div className="text-4xl mt-10">
-          <i className="fa fa-circle-o-notch fa-spin"></i>
-        </div>
-        <p className="mt-4">正在加载心愿清单...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto p-6">
@@ -1762,25 +1551,20 @@ const ModuleCard = ({ title, icon, description, onClick }) => (
 
 const Navbar = () => {
   // 获取当前积分显示在导航栏
-  const [user, setUser] = useState(null);
   const [points, setPoints] = useState(0);
   
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUser(user);
-        // 加载积分
-        const pointsRef = ref(db, `users/${user.uid}/points`);
-        onValue(pointsRef, (snapshot) => {
-          setPoints(snapshot.val() || 0);
-        });
-      } else {
-        setUser(null);
-        setPoints(0);
-      }
-    });
+    const savedPoints = localStorage.getItem('lifeGamePoints') || '0';
+    setPoints(parseInt(savedPoints));
     
-    return () => unsubscribe();
+    // 监听storage事件，同步其他页面的积分变化
+    const handleStorageChange = () => {
+      const newPoints = localStorage.getItem('lifeGamePoints') || '0';
+      setPoints(parseInt(newPoints));
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   return (

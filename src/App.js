@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { HashRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { Line } from 'react-chartjs-2';
 import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
 import Particles from 'react-tsparticles';
@@ -18,37 +18,118 @@ const getToday = () => {
   return formatDate(new Date());
 };
 
-// 页面组件
-const Home = () => (
-  <div className="container mx-auto p-6">
-    <div className="text-center mb-10">
-      <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
-        游戏化人生管理工具
-      </h1>
-      <p className="text-xl text-gray-300">创建任务，设定周期，追踪你的生活进度！</p>
-    </div>
+// 任务分类
+const TASK_CATEGORIES = [
+  { id: 'skill', name: '技能', icon: 'graduation-cap' },
+  { id: 'fitness', name: '健身', icon: 'heartbeat' },
+  { id: 'habit', name: '好习惯', icon: 'leaf' },
+  { id: 'growth', name: '成长', icon: 'line-chart' },
+  { id: 'finance', name: '财务', icon: 'money' },
+  { id: 'social', name: '社交', icon: 'users' },
+];
 
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Card title="任务管理" icon="check-square-o" description="创建带时间属性的任务，按周期自动提醒" />
-      <Card title="成就系统" icon="trophy" description="完成任务目标，解锁专属成就" />
-      <Card title="数据统计" icon="line-chart" description="分析你的完成情况，优化时间管理" />
+// 页面组件
+const Home = () => {
+  const navigate = useNavigate();
+  
+  // 从localStorage获取数据用于展示统计
+  const [stats, setStats] = useState({
+    totalTasks: 0,
+    completedTasks: 0,
+    totalExp: 0,
+    level: 1
+  });
+  
+  useEffect(() => {
+    const tasks = JSON.parse(localStorage.getItem('lifeGameTasks') || '[]');
+    const completedTasks = tasks.filter(task => task.completed).length;
+    const totalExp = tasks
+      .filter(task => task.completed)
+      .reduce((sum, task) => sum + task.exp, 0);
+    const level = Math.floor(totalExp / 1000) + 1;
+    
+    setStats({
+      totalTasks: tasks.length,
+      completedTasks,
+      totalExp,
+      level
+    });
+  }, []);
+
+  return (
+    <div className="container mx-auto p-6">
+      <div className="text-center mb-10">
+        <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+          游戏化人生管理工具
+        </h1>
+        <p className="text-xl text-gray-300">创建任务，积累经验，解锁成就，兑换奖励！</p>
+        
+        <div className="mt-6 inline-flex items-center bg-gray-800 px-4 py-2 rounded-full">
+          <i className="fa fa-star text-yellow-400 mr-2"></i>
+          <span>等级 {stats.level}</span>
+          <div className="mx-3 h-2 bg-gray-700 rounded-full flex-1 w-40">
+            <div 
+              className="h-full bg-blue-500 rounded-full" 
+              style={{ width: `${(stats.totalExp % 1000) / 10}%` }}
+            ></div>
+          </div>
+          <span className="text-sm text-gray-400">{stats.totalExp} XP</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <ModuleCard 
+          title="任务管理" 
+          icon="check-square-o" 
+          description="创建分类任务，按周期自动提醒" 
+          onClick={() => navigate('/tasks')}
+        />
+        <ModuleCard 
+          title="成就系统" 
+          icon="trophy" 
+          description="完成分类目标，解锁专属成就" 
+          onClick={() => navigate('/achievements')}
+        />
+        <ModuleCard 
+          title="数据统计" 
+          icon="line-chart" 
+          description="分析完成情况，优化时间管理" 
+          onClick={() => navigate('/stats')}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <ModuleCard 
+          title="幸运抽奖" 
+          icon="gift" 
+          description="消耗积分参与抽奖，赢取奖励" 
+          onClick={() => navigate('/lottery')}
+        />
+        <ModuleCard 
+          title="心愿清单" 
+          icon="list-alt" 
+          description="记录愿望，用成就积分兑换实现" 
+          onClick={() => navigate('/wishes')}
+        />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const Tasks = () => {
   // 任务状态管理
   const [tasks, setTasks] = useState(() => {
-    // 从localStorage加载任务
     const saved = localStorage.getItem('lifeGameTasks');
     return saved ? JSON.parse(saved) : [];
   });
   const [todayTasks, setTodayTasks] = useState([]);
   const today = getToday();
+  const [activeCategory, setActiveCategory] = useState('all');
 
   // 任务表单状态
   const [taskForm, setTaskForm] = useState({
     title: '',
+    category: 'skill',
     difficulty: 'medium',
     repeat: 'daily', // daily, weekly, monthly, once, range
     startDate: today,
@@ -107,8 +188,13 @@ const Tasks = () => {
       return false;
     });
     
-    setTodayTasks(filtered);
-  }, [tasks, today]);
+    // 应用分类筛选
+    const categorized = activeCategory === 'all' 
+      ? filtered 
+      : filtered.filter(task => task.category === activeCategory);
+      
+    setTodayTasks(categorized);
+  }, [tasks, today, activeCategory]);
 
   // 处理任务表单变化
   const handleFormChange = (e) => {
@@ -124,6 +210,7 @@ const Tasks = () => {
     const newTask = {
       id: Date.now(),
       title: taskForm.title,
+      category: taskForm.category,
       difficulty: taskForm.difficulty,
       repeat: taskForm.repeat,
       startDate: taskForm.startDate,
@@ -131,26 +218,34 @@ const Tasks = () => {
       specificDate: taskForm.specificDate,
       completed: false,
       exp: expMap[taskForm.difficulty],
+      points: expMap[taskForm.difficulty] / 3, // 积分 = 经验值 / 3
       createdAt: today
     };
     
     setTasks(prev => [...prev, newTask]);
     // 重置表单
-    setTaskForm({
+    setTaskForm(prev => ({
+      ...prev,
       title: '',
-      difficulty: 'medium',
-      repeat: 'daily',
-      startDate: today,
-      endDate: today,
-      specificDate: today
-    });
+    }));
   };
 
   // 切换任务完成状态
   const toggleTask = (id) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, completed: !task.completed } : task
-    ));
+    setTasks(tasks.map(task => {
+      if (task.id === id && !task.completed) {
+        // 完成任务时增加积分
+        addPoints(task.points);
+      }
+      return task.id === id ? { ...task, completed: !task.completed } : task;
+    }));
+  };
+
+  // 增加积分
+  const addPoints = (amount) => {
+    const currentPoints = parseInt(localStorage.getItem('lifeGamePoints') || '0');
+    const newPoints = currentPoints + amount;
+    localStorage.setItem('lifeGamePoints', newPoints.toString());
   };
 
   // 删除任务
@@ -181,18 +276,32 @@ const Tasks = () => {
             />
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-gray-300 mb-1">难度 (经验值)</label>
+              <label className="block text-gray-300 mb-1">任务分类</label>
+              <select
+                name="category"
+                value={taskForm.category}
+                onChange={handleFormChange}
+                className="w-full p-2 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {TASK_CATEGORIES.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-gray-300 mb-1">难度 (经验值/积分)</label>
               <select
                 name="difficulty"
                 value={taskForm.difficulty}
                 onChange={handleFormChange}
                 className="w-full p-2 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="easy">简单 (30 XP)</option>
-                <option value="medium">中等 (50 XP)</option>
-                <option value="hard">困难 (100 XP)</option>
+                <option value="easy">简单 (30 XP / 10 积分)</option>
+                <option value="medium">中等 (50 XP / 17 积分)</option>
+                <option value="hard">困难 (100 XP / 33 积分)</option>
               </select>
             </div>
             
@@ -269,56 +378,93 @@ const Tasks = () => {
 
       {/* 今日任务列表 */}
       <div>
-        <h3 className="text-xl font-semibold mb-4 flex items-center">
-          <i className="fa fa-calendar mr-2"></i>今日任务 ({today})
-        </h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-semibold flex items-center">
+            <i className="fa fa-calendar mr-2"></i>今日任务 ({today})
+          </h3>
+          
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setActiveCategory('all')}
+              className={`px-3 py-1 rounded text-sm ${
+                activeCategory === 'all' 
+                  ? 'bg-blue-600' 
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            >
+              全部
+            </button>
+            {TASK_CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
+                  activeCategory === cat.id 
+                    ? 'bg-blue-600' 
+                    : 'bg-gray-700 hover:bg-gray-600'
+                }`}
+              >
+                <i className={`fa fa-${cat.icon}`}></i>
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        </div>
         
         {todayTasks.length === 0 ? (
           <div className="p-8 bg-gray-800 rounded-lg text-center text-gray-400">
             <i className="fa fa-inbox text-4xl mb-3"></i>
-            <p>今天没有任务，去创建新任务吧！</p>
+            <p>今天没有{activeCategory !== 'all' ? TASK_CATEGORIES.find(c => c.id === activeCategory)?.name : ''}任务，去创建新任务吧！</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {todayTasks.map(task => (
-              <div 
-                key={task.id}
-                className={`p-4 rounded-lg flex justify-between items-center ${
-                  task.completed 
-                    ? 'bg-gray-700 line-through text-gray-400' 
-                    : task.difficulty === 'easy' 
-                      ? 'bg-green-900/30' 
-                      : task.difficulty === 'medium'
-                        ? 'bg-yellow-900/30'
-                        : 'bg-red-900/30'
-                }`}
-              >
-                <div className="flex items-center gap-3 flex-1">
-                  <button 
-                    onClick={() => toggleTask(task.id)}
-                    className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                      task.completed ? 'bg-green-500' : 'border-2 border-gray-400'
-                    }`}
-                  >
-                    {task.completed && <i className="fa fa-check text-white text-xs"></i>}
-                  </button>
-                  <span>{task.title}</span>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <span className="px-2 py-1 bg-gray-700 rounded text-sm">
-                    +{task.exp} XP
-                  </span>
+            {todayTasks.map(task => {
+              const category = TASK_CATEGORIES.find(c => c.id === task.category);
+              return (
+                <div 
+                  key={task.id}
+                  className={`p-4 rounded-lg flex justify-between items-center ${
+                    task.completed 
+                      ? 'bg-gray-700 line-through text-gray-400' 
+                      : task.difficulty === 'easy' 
+                        ? 'bg-green-900/30' 
+                        : task.difficulty === 'medium'
+                          ? 'bg-yellow-900/30'
+                          : 'bg-red-900/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <button 
+                      onClick={() => toggleTask(task.id)}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                        task.completed ? 'bg-green-500' : 'border-2 border-gray-400'
+                      }`}
+                    >
+                      {task.completed && <i className="fa fa-check text-white text-xs"></i>}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <i className={`fa fa-${category?.icon} text-gray-400`}></i>
+                      <span>{task.title}</span>
+                    </div>
+                  </div>
                   
-                  <button 
-                    onClick={() => deleteTask(task.id)}
-                    className="text-gray-400 hover:text-red-400"
-                  >
-                    <i className="fa fa-trash"></i>
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-1 bg-gray-700 rounded text-sm flex items-center gap-1">
+                      <i className="fa fa-diamond text-blue-400"></i> {task.exp} XP
+                    </span>
+                    <span className="px-2 py-1 bg-gray-700 rounded text-sm flex items-center gap-1">
+                      <i className="fa fa-ticket text-yellow-400"></i> {Math.round(task.points)}
+                    </span>
+                    <button 
+                      onClick={() => deleteTask(task.id)}
+                      className="text-gray-400 hover:text-red-400"
+                    >
+                      <i className="fa fa-trash"></i>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -333,55 +479,197 @@ const Achievements = () => {
     return saved ? JSON.parse(saved) : [];
   });
   
-  // 计算已完成任务数量
-  const completedTasks = tasks.filter(task => task.completed).length;
+  // 计算分类任务完成数
+  const getCategoryCompletedCount = (categoryId) => {
+    return tasks.filter(task => task.completed && task.category === categoryId).length;
+  };
   
-  // 成就数据
+  // 计算总完成任务数
+  const totalCompleted = tasks.filter(task => task.completed).length;
+  const totalCreated = tasks.length;
+  
+  // 成就数据 - 包含各分类成就
   const achievements = [
+    // 通用成就
     { 
       id: 1, 
       title: "第一步", 
       description: "创建第一个任务", 
-      unlocked: tasks.length > 0, 
-      icon: "flag" 
+      unlocked: totalCreated > 0, 
+      icon: "flag",
+      points: 50
     },
     { 
       id: 2, 
       title: "行动派", 
       description: "完成第一个任务", 
-      unlocked: completedTasks > 0, 
-      icon: "check-circle" 
+      unlocked: totalCompleted > 0, 
+      icon: "check-circle",
+      points: 50
     },
     { 
       id: 3, 
       title: "坚持不懈", 
       description: "完成10个任务", 
-      unlocked: completedTasks >= 10, 
-      icon: "calendar-check-o" 
+      unlocked: totalCompleted >= 10, 
+      icon: "calendar-check-o",
+      points: 100
     },
     { 
       id: 4, 
       title: "任务达人", 
       description: "创建50个任务", 
-      unlocked: tasks.length >= 50, 
-      icon: "list-alt" 
+      unlocked: totalCreated >= 50, 
+      icon: "list-alt",
+      points: 200
+    },
+    
+    // 技能分类成就
+    { 
+      id: 101, 
+      category: "skill",
+      title: "技能新手", 
+      description: "完成5个技能类任务", 
+      unlocked: getCategoryCompletedCount('skill') >= 5, 
+      icon: "graduation-cap",
+      points: 80
+    },
+    { 
+      id: 102, 
+      category: "skill",
+      title: "技能大师", 
+      description: "完成30个技能类任务", 
+      unlocked: getCategoryCompletedCount('skill') >= 30, 
+      icon: "mortar-board",
+      points: 200
+    },
+    
+    // 健身分类成就
+    { 
+      id: 201, 
+      category: "fitness",
+      title: "健身入门", 
+      description: "完成5个健身类任务", 
+      unlocked: getCategoryCompletedCount('fitness') >= 5, 
+      icon: "heartbeat",
+      points: 80
+    },
+    { 
+      id: 202, 
+      category: "fitness",
+      title: "运动健将", 
+      description: "完成30个健身类任务", 
+      unlocked: getCategoryCompletedCount('fitness') >= 30, 
+      icon: "futbol-o",
+      points: 200
+    },
+    
+    // 好习惯分类成就
+    { 
+      id: 301, 
+      category: "habit",
+      title: "习惯养成", 
+      description: "完成5个好习惯类任务", 
+      unlocked: getCategoryCompletedCount('habit') >= 5, 
+      icon: "leaf",
+      points: 80
+    },
+    { 
+      id: 302, 
+      category: "habit",
+      title: "自律达人", 
+      description: "完成30个好习惯类任务", 
+      unlocked: getCategoryCompletedCount('habit') >= 30, 
+      icon: "sun-o",
+      points: 200
+    },
+    
+    // 成长分类成就
+    { 
+      id: 401, 
+      category: "growth",
+      title: "成长起步", 
+      description: "完成5个成长类任务", 
+      unlocked: getCategoryCompletedCount('growth') >= 5, 
+      icon: "line-chart",
+      points: 80
+    },
+    { 
+      id: 402, 
+      category: "growth",
+      title: "持续成长", 
+      description: "完成30个成长类任务", 
+      unlocked: getCategoryCompletedCount('growth') >= 30, 
+      icon: "area-chart",
+      points: 200
     }
   ];
+  
+  // 计算已解锁成就
+  const unlockedAchievements = achievements.filter(a => a.unlocked);
+  const [activeFilter, setActiveFilter] = useState('all');
+  
+  // 过滤显示的成就
+  const filteredAchievements = activeFilter === 'all'
+    ? achievements
+    : activeFilter === 'unlocked'
+      ? achievements.filter(a => a.unlocked)
+      : achievements.filter(a => a.category === activeFilter);
 
   return (
     <div className="container mx-auto p-6">
       <h2 className="text-3xl font-bold mb-6 flex items-center">
         <i className="fa fa-trophy mr-2"></i>成就系统
+        <span className="ml-3 text-lg text-gray-400">
+          已解锁 {unlockedAchievements.length}/{achievements.length}
+        </span>
       </h2>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {achievements.map(achievement => (
+      <div className="flex flex-wrap gap-2 mb-6">
+        <button
+          onClick={() => setActiveFilter('all')}
+          className={`px-3 py-1 rounded text-sm ${
+            activeFilter === 'all' 
+              ? 'bg-blue-600' 
+              : 'bg-gray-700 hover:bg-gray-600'
+          }`}
+        >
+          全部成就
+        </button>
+        <button
+          onClick={() => setActiveFilter('unlocked')}
+          className={`px-3 py-1 rounded text-sm ${
+            activeFilter === 'unlocked' 
+              ? 'bg-green-600' 
+              : 'bg-gray-700 hover:bg-gray-600'
+          }`}
+        >
+          已解锁
+        </button>
+        {TASK_CATEGORIES.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveFilter(cat.id)}
+            className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
+              activeFilter === cat.id 
+                ? 'bg-purple-600' 
+                : 'bg-gray-700 hover:bg-gray-600'
+            }`}
+          >
+            <i className={`fa fa-${cat.icon}`}></i>
+            {cat.name}类
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredAchievements.map(achievement => (
           <div 
             key={achievement.id}
             className={`p-6 rounded-lg border ${
               achievement.unlocked 
-                ? 'border-yellow-500 bg-yellow-950/30' 
-                : 'border-gray-700 bg-gray-800/50'
+                ? 'border-yellow-500 bg-yellow-950/30 transform hover:scale-105 transition-transform' 
+                : 'border-gray-700 bg-gray-800/50 opacity-70'
             }`}
           >
             <div className="flex items-start gap-4">
@@ -390,8 +678,15 @@ const Achievements = () => {
               }`}>
                 <i className={`fa fa-${achievement.icon}`}></i>
               </div>
-              <div>
-                <h3 className="text-xl font-semibold mb-1">{achievement.title}</h3>
+              <div className="flex-1">
+                <div className="flex justify-between items-start">
+                  <h3 className="text-xl font-semibold mb-1">{achievement.title}</h3>
+                  {achievement.unlocked && (
+                    <span className="px-2 py-1 bg-yellow-900 text-yellow-300 text-xs rounded flex items-center gap-1">
+                      <i className="fa fa-ticket"></i> +{achievement.points}
+                    </span>
+                  )}
+                </div>
                 <p className="text-gray-400 mb-3">{achievement.description}</p>
                 <span className={`text-sm px-3 py-1 rounded-full ${
                   achievement.unlocked 
@@ -400,6 +695,12 @@ const Achievements = () => {
                 }`}>
                   {achievement.unlocked ? '已解锁' : '未解锁'}
                 </span>
+                {achievement.category && (
+                  <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                    <i className={`fa fa-${TASK_CATEGORIES.find(c => c.id === achievement.category)?.icon}`}></i>
+                    {TASK_CATEGORIES.find(c => c.id === achievement.category)?.name}类成就
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -427,6 +728,18 @@ const Stats = () => {
   // 计算等级 (每1000经验升一级)
   const level = Math.floor(totalExp / 1000) + 1;
   const expToNextLevel = 1000 - (totalExp % 1000);
+
+  // 计算分类统计
+  const categoryStats = TASK_CATEGORIES.map(cat => {
+    const catTasks = tasks.filter(task => task.category === cat.id);
+    const completed = catTasks.filter(task => task.completed).length;
+    return {
+      ...cat,
+      total: catTasks.length,
+      completed,
+      rate: catTasks.length > 0 ? Math.round((completed / catTasks.length) * 100) : 0
+    };
+  });
 
   // 最近7天的任务完成情况
   const getLast7DaysData = () => {
@@ -511,6 +824,34 @@ const Stats = () => {
         </div>
       </div>
 
+      <div className="mb-8">
+        <h3 className="text-xl font-semibold mb-4">分类任务完成情况</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {categoryStats.map(cat => (
+            <div key={cat.id} className="p-4 bg-gray-800 rounded-lg">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="font-medium flex items-center gap-2">
+                  <i className={`fa fa-${cat.icon} text-blue-400`}></i>
+                  {cat.name}
+                </h4>
+                <span>{cat.completed}/{cat.total}</span>
+              </div>
+              <div className="h-2 bg-gray-700 rounded-full">
+                <div 
+                  className="h-full rounded-full"
+                  style={{ 
+                    width: `${cat.rate}%`,
+                    backgroundColor: cat.rate > 70 ? 'rgb(16, 185, 129)' : 
+                                   cat.rate > 30 ? 'rgb(234, 179, 8)' : 'rgb(239, 68, 68)'
+                  }}
+                ></div>
+              </div>
+              <div className="mt-2 text-right text-sm text-gray-400">{cat.rate}% 完成率</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="bg-gray-800 p-6 rounded-lg">
         <h3 className="text-xl font-semibold mb-4">最近7天完成情况</h3>
         <div className="h-80">
@@ -535,38 +876,464 @@ const Stats = () => {
   );
 };
 
+// 新增：抽奖系统
+const Lottery = () => {
+  const [points, setPoints] = useState(() => {
+    return parseInt(localStorage.getItem('lifeGamePoints') || '0');
+  });
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [result, setResult] = useState(null);
+  const [history, setHistory] = useState(() => {
+    const saved = localStorage.getItem('lifeGameLotteryHistory');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // 保存历史记录
+  useEffect(() => {
+    localStorage.setItem('lifeGameLotteryHistory', JSON.stringify(history));
+  }, [history]);
+
+  // 抽奖奖品配置
+  const prizes = [
+    { id: 1, name: "50积分", value: 50, probability: 30, icon: "ticket", color: "yellow" },
+    { id: 2, name: "100积分", value: 100, probability: 20, icon: "ticket", color: "green" },
+    { id: 3, name: "200积分", value: 200, probability: 10, icon: "ticket", color: "blue" },
+    { id: 4, name: "谢谢参与", value: 0, probability: 35, icon: "meh-o", color: "gray" },
+    { id: 5, name: "心愿兑换券", value: 1, type: "wish", probability: 5, icon: "gift", color: "purple" }
+  ];
+
+  // 开始抽奖
+  const startLottery = () => {
+    // 检查积分是否足够
+    if (points < 20) {
+      alert("积分不足！每次抽奖需要20积分");
+      return;
+    }
+    
+    // 扣除积分
+    const newPoints = points - 20;
+    setPoints(newPoints);
+    localStorage.setItem('lifeGamePoints', newPoints.toString());
+    
+    // 开始旋转动画
+    setIsSpinning(true);
+    setResult(null);
+    
+    // 3秒后显示结果
+    setTimeout(() => {
+      // 随机抽奖算法
+      const random = Math.random() * 100;
+      let cumulativeProbability = 0;
+      let winningPrize = null;
+      
+      for (const prize of prizes) {
+        cumulativeProbability += prize.probability;
+        if (random <= cumulativeProbability) {
+          winningPrize = prize;
+          break;
+        }
+      }
+      
+      // 处理中奖结果
+      if (winningPrize) {
+        setResult(winningPrize);
+        
+        // 记录历史
+        setHistory(prev => [
+          {
+            id: Date.now(),
+            prize: winningPrize,
+            date: new Date().toLocaleString()
+          },
+          ...prev.slice(0, 9) // 只保留最近10条记录
+        ]);
+        
+        // 如果中奖的是积分，增加积分
+        if (winningPrize.type !== "wish" && winningPrize.value > 0) {
+          const updatedPoints = newPoints + winningPrize.value;
+          setPoints(updatedPoints);
+          localStorage.setItem('lifeGamePoints', updatedPoints.toString());
+        }
+      }
+      
+      setIsSpinning(false);
+    }, 3000);
+  };
+
+  return (
+    <div className="container mx-auto p-6">
+      <h2 className="text-3xl font-bold mb-6 flex items-center">
+        <i className="fa fa-gift mr-2"></i>幸运抽奖
+      </h2>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <div className="bg-gray-800 rounded-lg p-6 text-center">
+            <div className="mb-6">
+              <span className="inline-block px-4 py-2 bg-yellow-900 text-yellow-300 rounded-full text-lg">
+                当前积分: <span className="font-bold">{points}</span>
+              </span>
+              <p className="text-gray-400 mt-2">每次抽奖消耗20积分</p>
+            </div>
+            
+            {/* 抽奖转盘 */}
+            <div className="relative w-64 h-64 mx-auto mb-6">
+              <div className={`absolute inset-0 rounded-full border-8 border-gray-700 flex items-center justify-center ${isSpinning ? 'animate-spin' : ''}`} style={{ animationDuration: '0.5s' }}>
+                {!isSpinning && !result && (
+                  <div className="text-center">
+                    <i className="fa fa-gift text-5xl text-blue-400 mb-2"></i>
+                    <p>点击开始抽奖</p>
+                  </div>
+                )}
+                
+                {isSpinning && (
+                  <div className="text-center">
+                    <i className="fa fa-refresh text-5xl text-blue-400 mb-2 fa-spin"></i>
+                    <p>抽奖中...</p>
+                  </div>
+                )}
+                
+                {!isSpinning && result && (
+                  <div className="text-center p-4">
+                    <i className={`fa fa-${result.icon} text-5xl text-${result.color}-400 mb-2`}></i>
+                    <h3 className="text-xl font-bold">{result.name}</h3>
+                    {result.type === "wish" && (
+                      <p className="text-green-400 text-sm mt-2">可用于兑换一个心愿！</p>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {/* 转盘指针 */}
+              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-6 h-12 bg-red-500 clip-triangle"></div>
+            </div>
+            
+            <button
+              onClick={startLottery}
+              disabled={isSpinning || points < 20}
+              className={`px-8 py-3 rounded-lg font-medium transition-colors ${
+                isSpinning || points < 20
+                  ? 'bg-gray-700 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+            >
+              {isSpinning ? '抽奖中...' : '开始抽奖 (20积分)'}
+            </button>
+          </div>
+          
+          {/* 奖品说明 */}
+          <div className="mt-6 bg-gray-800 rounded-lg p-6">
+            <h3 className="text-xl font-semibold mb-4">奖品说明</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {prizes.map(prize => (
+                <div key={prize.id} className="flex items-center gap-3 p-3 bg-gray-700 rounded-lg">
+                  <i className={`fa fa-${prize.icon} text-${prize.color}-400 text-xl`}></i>
+                  <div>
+                    <div className="font-medium">{prize.name}</div>
+                    <div className="text-xs text-gray-400">概率: {prize.probability}%</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* 抽奖历史 */}
+        <div>
+          <div className="bg-gray-800 rounded-lg p-6 h-full">
+            <h3 className="text-xl font-semibold mb-4">抽奖历史</h3>
+            
+            {history.length === 0 ? (
+              <div className="text-center text-gray-400 py-8">
+                <i className="fa fa-history text-4xl mb-2"></i>
+                <p>暂无抽奖记录</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar">
+                {history.map(item => (
+                  <div key={item.id} className="p-3 bg-gray-700 rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2">
+                        <i className={`fa fa-${item.prize.icon} text-${item.prize.color}-400`}></i>
+                        <span>{item.prize.name}</span>
+                      </div>
+                      <span className="text-xs text-gray-400">{item.date}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 新增：心愿清单
+const Wishes = () => {
+  const [wishes, setWishes] = useState(() => {
+    const saved = localStorage.getItem('lifeGameWishes');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [newWish, setNewWish] = useState('');
+  const [wishPoints, setWishPoints] = useState(0);
+  const [wishTickets, setWishTickets] = useState(0);
+
+  // 加载积分和心愿券数量
+  useEffect(() => {
+    const points = parseInt(localStorage.getItem('lifeGamePoints') || '0');
+    setWishPoints(points);
+    
+    // 计算心愿券数量（从抽奖历史中统计）
+    const lotteryHistory = JSON.parse(localStorage.getItem('lifeGameLotteryHistory') || '[]');
+    const tickets = lotteryHistory.filter(item => item.prize.type === 'wish').length;
+    setWishTickets(tickets);
+  }, []);
+
+  // 保存心愿到localStorage
+  useEffect(() => {
+    localStorage.setItem('lifeGameWishes', JSON.stringify(wishes));
+  }, [wishes]);
+
+  // 添加新心愿
+  const addWish = () => {
+    if (!newWish.trim()) return;
+    
+    setWishes(prev => [
+      ...prev,
+      {
+        id: Date.now(),
+        title: newWish,
+        status: 'pending', // pending, in_progress, completed
+        points: 0,
+        createdAt: new Date().toLocaleString()
+      }
+    ]);
+    
+    setNewWish('');
+  };
+
+  // 兑换心愿（使用心愿券）
+  const redeemWish = (id) => {
+    if (wishTickets < 1) {
+      alert("没有足够的心愿兑换券！可以通过抽奖获得。");
+      return;
+    }
+    
+    // 更新心愿状态
+    setWishes(prev => prev.map(wish => 
+      wish.id === id ? { ...wish, status: 'completed' } : wish
+    ));
+    
+    // 减少心愿券数量（更新抽奖历史）
+    const lotteryHistory = JSON.parse(localStorage.getItem('lifeGameLotteryHistory') || '[]');
+    // 找到第一个心愿券并移除
+    const updatedHistory = lotteryHistory.filter(item => !(item.prize.type === 'wish' && item.used !== true));
+    if (updatedHistory.length < lotteryHistory.length) {
+      // 标记第一个心愿券为已使用
+      const firstTicketIndex = lotteryHistory.findIndex(item => item.prize.type === 'wish' && item.used !== true);
+      if (firstTicketIndex !== -1) {
+        lotteryHistory[firstTicketIndex].used = true;
+        localStorage.setItem('lifeGameLotteryHistory', JSON.stringify(lotteryHistory));
+        setWishTickets(wishTickets - 1);
+      }
+    }
+  };
+
+  // 删除心愿
+  const deleteWish = (id) => {
+    setWishes(prev => prev.filter(wish => wish.id !== id));
+  };
+
+  return (
+    <div className="container mx-auto p-6">
+      <h2 className="text-3xl font-bold mb-6 flex items-center">
+        <i className="fa fa-list-alt mr-2"></i>心愿清单
+      </h2>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          {/* 新增心愿表单 */}
+          <div className="mb-6 p-5 bg-gray-800 rounded-lg">
+            <h3 className="text-xl font-semibold mb-4">添加新心愿</h3>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={newWish}
+                onChange={(e) => setNewWish(e.target.value)}
+                placeholder="输入你的心愿..."
+                className="flex-1 p-2 bg-gray-700 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={addWish}
+                className="p-2 bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+              >
+                <i className="fa fa-plus mr-1"></i>添加
+              </button>
+            </div>
+          </div>
+          
+          {/* 心愿列表 */}
+          <div>
+            <h3 className="text-xl font-semibold mb-4">我的心愿</h3>
+            
+            {wishes.length === 0 ? (
+              <div className="p-8 bg-gray-800 rounded-lg text-center text-gray-400">
+                <i className="fa fa-star-o text-4xl mb-3"></i>
+                <p>还没有心愿，添加一个吧！</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {wishes.map(wish => (
+                  <div 
+                    key={wish.id}
+                    className={`p-4 rounded-lg ${
+                      wish.status === 'completed' 
+                        ? 'bg-green-900/30' 
+                        : wish.status === 'in_progress'
+                          ? 'bg-yellow-900/30'
+                          : 'bg-gray-800'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className={`font-medium ${wish.status === 'completed' ? 'line-through' : ''}`}>
+                          {wish.title}
+                        </h4>
+                        <div className="text-xs text-gray-400 mt-1">
+                          添加于 {wish.createdAt}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        {wish.status === 'completed' ? (
+                          <span className="px-2 py-1 bg-green-900 text-green-300 rounded text-sm">
+                            已实现
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => redeemWish(wish.id)}
+                            className="px-2 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm"
+                          >
+                            <i className="fa fa-gift mr-1"></i>兑换
+                          </button>
+                        )}
+                        
+                        <button 
+                          onClick={() => deleteWish(wish.id)}
+                          className="text-gray-400 hover:text-red-400"
+                        >
+                          <i className="fa fa-trash"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* 兑换资源 */}
+        <div>
+          <div className="bg-gray-800 rounded-lg p-6 h-full">
+            <h3 className="text-xl font-semibold mb-6">兑换资源</h3>
+            
+            <div className="space-y-6">
+              <div className="text-center p-4 bg-yellow-900/30 rounded-lg">
+                <i className="fa fa-ticket text-4xl text-yellow-400 mb-2"></i>
+                <h4 className="text-lg font-medium mb-1">心愿兑换券</h4>
+                <p className="text-3xl font-bold">{wishTickets}</p>
+                <p className="text-xs text-gray-400 mt-2">可用于直接兑换心愿</p>
+              </div>
+              
+              <div className="text-center p-4 bg-blue-900/30 rounded-lg">
+                <i className="fa fa-diamond text-4xl text-blue-400 mb-2"></i>
+                <h4 className="text-lg font-medium mb-1">可用积分</h4>
+                <p className="text-3xl font-bold">{wishPoints}</p>
+                <p className="text-xs text-gray-400 mt-2">可用于参与抽奖</p>
+              </div>
+              
+              <div className="p-4 bg-gray-700 rounded-lg">
+                <h4 className="font-medium mb-2">如何获得心愿兑换券？</h4>
+                <ul className="text-sm text-gray-300 space-y-2">
+                  <li className="flex items-start gap-2">
+                    <i className="fa fa-gift text-purple-400 mt-1"></i>
+                    <span>参与幸运抽奖有5%概率获得</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <i className="fa fa-trophy text-yellow-400 mt-1"></i>
+                    <span>完成特定成就可获得额外奖励</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // 通用组件
-const Card = ({ title, icon, description }) => (
-  <div className="bg-gray-800 rounded-lg p-6 hover:shadow-lg hover:shadow-blue-900/20 transition-all">
+const ModuleCard = ({ title, icon, description, onClick }) => (
+  <div 
+    className="bg-gray-800 rounded-lg p-6 hover:shadow-lg hover:shadow-blue-900/20 transition-all cursor-pointer transform hover:-translate-y-1"
+    onClick={onClick}
+  >
     <div className="text-4xl mb-4 text-blue-400">
       <i className={`fa fa-${icon}`}></i>
     </div>
     <h3 className="text-xl font-semibold mb-2">{title}</h3>
     <p className="text-gray-400">{description}</p>
+    <div className="mt-4 text-blue-400 flex items-center">
+      <span>查看详情</span>
+      <i className="fa fa-arrow-right ml-2"></i>
+    </div>
   </div>
 );
 
-const Navbar = () => (
-  <nav className="bg-gray-800 border-b border-gray-700">
-    <div className="container mx-auto px-4">
-      <div className="flex justify-between h-16">
-        <div className="flex items-center">
-          <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-            <i className="fa fa-gamepad text-blue-400"></i>
-            <span>人生游戏</span>
-          </Link>
-        </div>
-        
-        <div className="flex items-center gap-6">
-          <NavLink to="/">首页</NavLink>
-          <NavLink to="/tasks">任务</NavLink>
-          <NavLink to="/achievements">成就</NavLink>
-          <NavLink to="/stats">数据</NavLink>
+const Navbar = () => {
+  // 获取当前积分显示在导航栏
+  const [points, setPoints] = useState(0);
+  
+  useEffect(() => {
+    const savedPoints = localStorage.getItem('lifeGamePoints') || '0';
+    setPoints(parseInt(savedPoints));
+  }, []);
+
+  return (
+    <nav className="bg-gray-800 border-b border-gray-700">
+      <div className="container mx-auto px-4">
+        <div className="flex justify-between h-16">
+          <div className="flex items-center">
+            <Link to="/" className="flex items-center gap-2 font-bold text-xl">
+              <i className="fa fa-gamepad text-blue-400"></i>
+              <span>人生游戏</span>
+            </Link>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <div className="mr-4 px-3 py-1 bg-yellow-900/50 rounded-full text-sm flex items-center gap-1">
+              <i className="fa fa-ticket text-yellow-400"></i>
+              <span>{points}</span>
+            </div>
+            
+            <div className="flex items-center gap-6">
+              <NavLink to="/">首页</NavLink>
+              <NavLink to="/tasks">任务</NavLink>
+              <NavLink to="/achievements">成就</NavLink>
+              <NavLink to="/stats">数据</NavLink>
+              <NavLink to="/lottery">抽奖</NavLink>
+              <NavLink to="/wishes">心愿</NavLink>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </nav>
-);
+    </nav>
+  );
+};
 
 const NavLink = ({ to, children }) => (
   <Link 
@@ -633,6 +1400,8 @@ function App() {
             <Route path="/tasks" element={<Tasks />} />
             <Route path="/achievements" element={<Achievements />} />
             <Route path="/stats" element={<Stats />} />
+            <Route path="/lottery" element={<Lottery />} />
+            <Route path="/wishes" element={<Wishes />} />
           </Routes>
         </main>
         <footer className="absolute bottom-0 w-full py-4 bg-gray-800 text-center text-gray-400 text-sm">

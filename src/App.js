@@ -20,12 +20,12 @@ const getToday = () => {
 
 // 任务分类
 const TASK_CATEGORIES = [
-  { id: 'skill', name: '技能', icon: 'graduation-cap' },
-  { id: 'fitness', name: '健身', icon: 'heartbeat' },
-  { id: 'habit', name: '好习惯', icon: 'leaf' },
-  { id: 'growth', name: '成长', icon: 'line-chart' },
-  { id: 'finance', name: '财务', icon: 'money' },
-  { id: 'social', name: '社交', icon: 'users' },
+  { id: 'skill', name: '技能', icon: 'graduation-cap', color: 'blue' },
+  { id: 'fitness', name: '健身', icon: 'heartbeat', color: 'red' },
+  { id: 'habit', name: '好习惯', icon: 'leaf', color: 'green' },
+  { id: 'growth', name: '成长', icon: 'line-chart', color: 'purple' },
+  { id: 'finance', name: '财务', icon: 'money', color: 'yellow' },
+  { id: 'social', name: '社交', icon: 'users', color: 'cyan' },
 ];
 
 // 页面组件
@@ -39,6 +39,10 @@ const Home = () => {
     totalExp: 0,
     level: 1
   });
+  
+  // 获取今日任务
+  const [todayTasks, setTodayTasks] = useState([]);
+  const today = getToday();
   
   useEffect(() => {
     const tasks = JSON.parse(localStorage.getItem('lifeGameTasks') || '[]');
@@ -54,96 +58,8 @@ const Home = () => {
       totalExp,
       level
     });
-  }, []);
-
-  return (
-    <div className="container mx-auto p-6">
-      <div className="text-center mb-10">
-        <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
-          游戏化人生管理工具
-        </h1>
-        <p className="text-xl text-gray-300">创建任务，积累经验，解锁成就，兑换奖励！</p>
-        
-        <div className="mt-6 inline-flex items-center bg-gray-800 px-4 py-2 rounded-full">
-          <i className="fa fa-star text-yellow-400 mr-2"></i>
-          <span>等级 {stats.level}</span>
-          <div className="mx-3 h-2 bg-gray-700 rounded-full flex-1 w-40">
-            <div 
-              className="h-full bg-blue-500 rounded-full" 
-              style={{ width: `${(stats.totalExp % 1000) / 10}%` }}
-            ></div>
-          </div>
-          <span className="text-sm text-gray-400">{stats.totalExp} XP</span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <ModuleCard 
-          title="任务管理" 
-          icon="check-square-o" 
-          description="创建分类任务，按周期自动提醒" 
-          onClick={() => navigate('/tasks')}
-        />
-        <ModuleCard 
-          title="成就系统" 
-          icon="trophy" 
-          description="完成分类目标，解锁专属成就" 
-          onClick={() => navigate('/achievements')}
-        />
-        <ModuleCard 
-          title="数据统计" 
-          icon="line-chart" 
-          description="分析完成情况，优化时间管理" 
-          onClick={() => navigate('/stats')}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <ModuleCard 
-          title="幸运抽奖" 
-          icon="gift" 
-          description="消耗积分参与抽奖，赢取奖励" 
-          onClick={() => navigate('/lottery')}
-        />
-        <ModuleCard 
-          title="心愿清单" 
-          icon="list-alt" 
-          description="记录愿望，用成就积分兑换实现" 
-          onClick={() => navigate('/wishes')}
-        />
-      </div>
-    </div>
-  );
-};
-
-const Tasks = () => {
-  // 任务状态管理
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem('lifeGameTasks');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [todayTasks, setTodayTasks] = useState([]);
-  const today = getToday();
-  const [activeCategory, setActiveCategory] = useState('all');
-
-  // 任务表单状态
-  const [taskForm, setTaskForm] = useState({
-    title: '',
-    category: 'skill',
-    difficulty: 'medium',
-    repeat: 'daily', // daily, weekly, monthly, once, range
-    startDate: today,
-    endDate: today,
-    specificDate: today
-  });
-
-  // 保存任务到localStorage
-  useEffect(() => {
-    localStorage.setItem('lifeGameTasks', JSON.stringify(tasks));
-  }, [tasks]);
-
-  // 筛选今日任务
-  useEffect(() => {
+    
+    // 筛选今日任务
     const filtered = tasks.filter(task => {
       const taskDate = new Date(task.specificDate || task.startDate);
       const taskFormatted = formatDate(taskDate);
@@ -188,13 +104,240 @@ const Tasks = () => {
       return false;
     });
     
-    // 应用分类筛选
-    const categorized = activeCategory === 'all' 
-      ? filtered 
-      : filtered.filter(task => task.category === activeCategory);
+    setTodayTasks(filtered);
+  }, [today]);
+  
+  // 计算今日任务完成情况
+  const todayCompleted = todayTasks.filter(task => task.completed).length;
+  const todayCompletionRate = todayTasks.length > 0 
+    ? Math.round((todayCompleted / todayTasks.length) * 100) 
+    : 0;
+  
+  // 切换任务完成状态
+  const toggleTask = (id) => {
+    const tasks = JSON.parse(localStorage.getItem('lifeGameTasks') || '[]');
+    let updatedTasks = [];
+    let pointsToAdd = 0;
+    
+    updated (const task of tasks) {
+      if (task.id === id && !task.completed) {
+        pointsToAdd = task.points;
+        updatedTasks.push({ ...task, completed: true });
+      } else if (task.id === id && task.completed) {
+        // 取消完成时扣除积分
+        pointsToAdd = -task.points;
+        updatedTasks.push({ ...task, completed: false });
+      } else {
+        updatedTasks.push(task);
+      }
+    }
+    
+    // 更新任务
+    localStorage.setItem('lifeGameTasks', JSON.stringify(updatedTasks));
+    setTodayTasks(updatedTasks.filter(task => {
+      // 重新筛选今日任务
+      const taskDate = new Date(task.specificDate || task.startDate);
+      const taskFormatted = formatDate(taskDate);
       
-    setTodayTasks(categorized);
-  }, [tasks, today, activeCategory]);
+      if (task.repeat === 'once' && taskFormatted === today) return true;
+      if (task.repeat === 'daily') {
+        const start = new Date(task.startDate);
+        const end = new Date(task.endDate);
+        const now = new Date(today);
+        return now >= start && now <= end;
+      }
+      if (task.repeat === 'weekly') {
+        const start = new Date(task.startDate);
+        const end = new Date(task.endDate);
+        const now = new Date(today);
+        if (now < start || now > end) return false;
+        return new Date(task.startDate).getDay() === now.getDay();
+      }
+      if (task.repeat === 'monthly') {
+        const start = new Date(task.startDate);
+        const end = new Date(task.endDate);
+        const now = new Date(today);
+        if (now < start || now > end) return false;
+        return new Date(task.startDate).getDate() === now.getDate();
+      }
+      return false;
+    }));
+    
+    // 更新积分
+    if (pointsToAdd !== 0) {
+      const currentPoints = parseIntInt(localStorage.getItem('lifeGamePoints') || '0');
+      localStorage.setItem('lifeGamePoints', (currentPoints + pointsToAdd).toString());
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-6">
+      <div className="text-center mb-10">
+        <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+          游戏化人生管理工具
+        </h1>
+        <p className="text-xl text-gray-300">创建任务，积累经验，解锁成就，兑换奖励！</p>
+        
+        <div className="mt-6 inline-flex items-center bg-gray-800 px-4 py-2 rounded-full">
+          <i className="fa fa-star text-yellow-400 mr-2"></i>
+          <span>等级 {stats.level}</span>
+          <div className="mx-3 h-2 bg-gray-700 rounded-full flex-1 w-40">
+            <div 
+              className="h-full bg-blue-500 rounded-full" 
+              style={{ width: `${(stats.totalExp % 1000) / 10}%` }}
+            ></div>
+          </div>
+          <span className="text-sm text-gray-400">{stats.totalExp} XP</span>
+        </div>
+      </div>
+
+      {/* 今日任务概览模块 */}
+      <div className="mb-10 bg-gray-800 rounded-lg p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold flex items-center">
+            <i className="fa fa-calendar-check-o mr-2 text-blue-400"></i>
+            今日任务任务 ({today})
+          </h2>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-300">{todayCompleted}/{todayTasks.length} 完成</span>
+            <div className="h-2 bg-gray-700 rounded-full w-24">
+              <div 
+                className="h-full rounded-full"
+                style={{ 
+                  width: `${todayCompletionRate}%`,
+                  backgroundColor: todayCompletionRate > 70 ? 'rgb(16, 185, 129)' : 
+                                 todayCompletionRate > 30 ? 'rgb(234, 179, 8)' : 'rgb(239, 68, 68)'
+                }}
+              ></div>
+            </div>
+            <button 
+              onClick={() => navigate('/tasks')}
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
+            >
+              管理所有任务
+            </button>
+          </div>
+        </div>
+        
+        {todayTasks.length === 0 ? (
+          <div className="p-6 text-center text-gray-400">
+            <i className="fa fa-inbox text-4xl mb-3"></i>
+            <p>今天没有任务，去创建新任务吧！</p>
+            <button 
+              onClick={() => navigate('/tasks#add-task')}
+              className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded"
+            >
+              <i className="fa fa-plus mr-1"></i>添加新任务
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+            {todayTasks.map(task => {
+              const category = TASK_CATEGORIES.find(c => c.id === task.category);
+              return (
+                <div 
+                  key={task.id}
+                  className={`p-4 rounded-lg flex justify-between items-center ${
+                    task.completed 
+                      ? 'bg-gray-700 line-through text-gray-400' 
+                      : task.difficulty === 'easy' 
+                        ? 'bg-green-900/30' 
+                        : task.difficulty === 'medium'
+                          ? 'bg-yellow-900/30'
+                          : 'bg-red-900/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <button 
+                      onClick={() => toggleTask(task.id)}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                        task.completed ? 'bg-green-500' : 'border-2 border-gray-400'
+                      }`}
+                    >
+                      {task.completed && <i className="fa fa-check text-white text-xs"></i>}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <i className={`fa fa-${category?.icon} text-${category?.color}-400`}></i>
+                      <span>{task.title}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-1 bg-gray-700 rounded text-sm flex items-center gap-1">
+                      <i className="fa fa-diamond text-blue-400"></i> {task.exp} XP
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <ModuleCard 
+          title="任务管理" 
+          icon="check-square-o" 
+          description="查看和管理所有任务，设置重复周期" 
+          onClick={() => navigate('/tasks')}
+        />
+        <ModuleCard 
+          title="成就系统" 
+          icon="trophy" 
+          description="完成分类目标，解锁专属成就" 
+          onClick={() => navigate('/achievements')}
+        />
+        <ModuleCard 
+          title="数据统计" 
+          icon="line-chart" 
+          description="分析完成情况，优化时间管理" 
+          onClick={() => navigate('/stats')}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <ModuleCard 
+          title="幸运抽奖" 
+          icon="gift" 
+          description="消耗积分参与抽奖，赢取奖励" 
+          onClick={() => navigate('/lottery')}
+        />
+        <ModuleCard 
+          title="心愿清单" 
+          icon="list-alt" 
+          description="记录愿望，用成就积分兑换实现" 
+          onClick={() => navigate('/wishes')}
+        />
+      </div>
+    </div>
+  );
+};
+
+const Tasks = () => {
+  // 任务状态管理
+  const [tasks, setTasks] = useState(() => {
+    const saved = localStorage.getItem('lifeGameTasks');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const today = getToday();
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [editingTask, setEditingTask] = useState(null);
+
+  // 任务表单状态
+  const [taskForm, setTaskForm] = useState({
+    title: '',
+    category: 'skill',
+    difficulty: 'medium',
+    repeat: 'daily', // daily, weekly, monthly, once, range
+    startDate: today,
+    endDate: today,
+    specificDate: today
+  });
+
+  // 保存任务到localStorage
+  useEffect(() => {
+    localStorage.setItem('lifeGameTasks', JSON.stringify(tasks));
+  }, [tasks]);
 
   // 处理任务表单变化
   const handleFormChange = (e) => {
@@ -230,12 +373,71 @@ const Tasks = () => {
     }));
   };
 
+  // 编辑任务
+  const startEditing = (task) => {
+    setEditingTask(task.id);
+    setTaskForm({
+      title: task.title,
+      category: task.category,
+      difficulty: task.difficulty,
+      repeat: task.repeat,
+      startDate: task.startDate,
+      endDate: task.endDate,
+      specificDate: task.specificDate || today
+    });
+    
+    // 滚动到表单位置
+    document.getElementById('add-task').scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // 保存编辑
+  const saveEditing = (id) => {
+    if (!taskForm.title.trim()) return;
+    
+    const expMap = { easy: 30, medium: 50, hard: 100 };
+    setTasks(tasks.map(task => {
+      if (task.id === id) {
+        return {
+          ...task,
+          title: taskForm.title,
+          category: taskForm.category,
+          difficulty: taskForm.difficulty,
+          repeat: taskForm.repeat,
+          startDate: taskForm.startDate,
+          endDate: taskForm.endDate,
+          specificDate: taskForm.specificDate,
+          exp: expMap[taskForm.difficulty],
+          points: expMap[taskForm.difficulty] / 3
+        };
+      }
+      return task;
+    }));
+    
+    setEditingTask(null);
+    setTaskForm(prev => ({
+      ...prev,
+      title: '',
+    }));
+  };
+
+  // 取消编辑
+  const cancelEditing = () => {
+    setEditingTask(null);
+    setTaskForm(prev => ({
+      ...prev,
+      title: '',
+    }));
+  };
+
   // 切换任务完成状态
   const toggleTask = (id) => {
     setTasks(tasks.map(task => {
       if (task.id === id && !task.completed) {
         // 完成任务时增加积分
         addPoints(task.points);
+      } else if (task.id === id && task.completed) {
+        // 取消完成时扣除积分
+        addPoints(-task.points);
       }
       return task.id === id ? { ...task, completed: !task.completed } : task;
     }));
@@ -250,18 +452,27 @@ const Tasks = () => {
 
   // 删除任务
   const deleteTask = (id) => {
-    setTasks(tasks.filter(task => task.id !== id));
+    if (window.confirm('确定要删除这个任务吗？')) {
+      setTasks(tasks.filter(task => task.id !== id));
+    }
   };
+
+  // 筛选任务
+  const filteredTasks = activeCategory === 'all' 
+    ? tasks 
+    : tasks.filter(task => task.category === activeCategory);
 
   return (
     <div className="container mx-auto p-6">
       <h2 className="text-3xl font-bold mb-6 flex items-center">
-        <i className="fa fa-check-square-o mr-2"></i>任务管理
+        <i className="fa fa-check-square-o mr-2"></i>所有任务管理
       </h2>
 
-      {/* 任务创建表单 */}
-      <div className="mb-8 p-5 bg-gray-800 rounded-lg">
-        <h3 className="text-xl font-semibold mb-4">创建新任务</h3>
+      {/* 任务创建/编辑表单 */}
+      <div id="add-task" className="mb-8 p-5 bg-gray-800 rounded-lg">
+        <h3 className="text-xl font-semibold mb-4">
+          {editingTask ? '编辑任务' : '创建新任务'}
+        </h3>
         
         <div className="space-y-4">
           <div>
@@ -367,70 +578,102 @@ const Tasks = () => {
             )}
           </div>
           
-          <button
-            onClick={addTask}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded transition-colors font-medium"
-          >
-            <i className="fa fa-plus mr-1"></i>添加任务
-          </button>
+          <div className="flex gap-3">
+            {editingTask ? (
+              <>
+                <button
+                  onClick={() => saveEditing(editingTask)}
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 rounded transition-colors font-medium"
+                >
+                  <i className="fa fa-save mr-1"></i>保存修改
+                </button>
+                <button
+                  onClick={cancelEditing}
+                  className="py-3 px-6 bg-gray-600 hover:bg-gray-700 rounded transition-colors font-medium"
+                >
+                  取消
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={addTask}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded transition-colors font-medium"
+              >
+                <i className="fa fa-plus mr-1"></i>添加任务
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 今日任务列表 */}
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold flex items-center">
-            <i className="fa fa-calendar mr-2"></i>今日任务 ({today})
-          </h3>
-          
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setActiveCategory('all')}
-              className={`px-3 py-1 rounded text-sm ${
-                activeCategory === 'all' 
-                  ? 'bg-blue-600' 
-                  : 'bg-gray-700 hover:bg-gray-600'
-              }`}
-            >
-              全部
-            </button>
-            {TASK_CATEGORIES.map(cat => (
+      {/* 任务列表筛选器 */}
+      <div className="mb-6">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setActiveCategory('all')}
+            className={`px-3 py-1 rounded text-sm ${
+              activeCategory === 'all' 
+                ? 'bg-blue-600' 
+                : 'bg-gray-700 hover:bg-gray-600'
+            }`}
+          >
+            全部任务 <span className="ml-1 bg-gray-600 px-1.5 rounded text-xs">{tasks.length}</span>
+          </button>
+          {TASK_CATEGORIES.map(cat => {
+            const count = tasks.filter(task => task.category === cat.id).length;
+            return (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
                 className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
                   activeCategory === cat.id 
-                    ? 'bg-blue-600' 
+                    ? `bg-${cat.color}-600` 
                     : 'bg-gray-700 hover:bg-gray-600'
                 }`}
               >
                 <i className={`fa fa-${cat.icon}`}></i>
-                {cat.name}
+                {cat.name} <span className="ml-1 bg-gray-600 px-1.5 rounded text-xs">{count}</span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
-        
-        {todayTasks.length === 0 ? (
+      </div>
+
+      {/* 所有任务列表 */}
+      <div>
+        {filteredTasks.length === 0 ? (
           <div className="p-8 bg-gray-800 rounded-lg text-center text-gray-400">
-            <i className="fa fa-inbox text-4xl mb-3"></i>
-            <p>今天没有{activeCategory !== 'all' ? TASK_CATEGORIES.find(c => c.id === activeCategory)?.name : ''}任务，去创建新任务吧！</p>
+            <i className="fa fa-tasks text-4xl mb-3"></i>
+            <p>没有{activeCategory !== 'all' ? TASK_CATEGORIES.find(c => c.id === activeCategory)?.name : ''}任务</p>
+            <button 
+              onClick={() => {
+                setActiveCategory('all');
+                document.getElementById('add-task').scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded"
+            >
+              <i className="fa fa-plus mr-1"></i>创建新任务
+            </button>
           </div>
         ) : (
           <div className="space-y-3">
-            {todayTasks.map(task => {
+            {filteredTasks.map(task => {
               const category = TASK_CATEGORIES.find(c => c.id === task.category);
+              // 计算任务状态文本
+              let statusText = '';
+              if (task.repeat === 'daily') statusText = '每日任务';
+              if (task.repeat === 'weekly') statusText = '每周任务';
+              if (task.repeat === 'monthly') statusText = '每月任务';
+              if (task.repeat === 'once') statusText = `仅在 ${task.specificDate} 执行`;
+              if (task.repeat === 'range') statusText = `从 ${task.startDate} 到 ${task.endDate}`;
+              
               return (
                 <div 
                   key={task.id}
-                  className={`p-4 rounded-lg flex justify-between items-center ${
+                  className={`p-4 rounded-lg flex flex-col md:flex-row md:items-center gap-3 ${
                     task.completed 
                       ? 'bg-gray-700 line-through text-gray-400' 
-                      : task.difficulty === 'easy' 
-                        ? 'bg-green-900/30' 
-                        : task.difficulty === 'medium'
-                          ? 'bg-yellow-900/30'
-                          : 'bg-red-900/30'
+                      : 'bg-gray-800'
                   }`}
                 >
                   <div className="flex items-center gap-3 flex-1">
@@ -443,18 +686,33 @@ const Tasks = () => {
                       {task.completed && <i className="fa fa-check text-white text-xs"></i>}
                     </button>
                     <div className="flex items-center gap-2">
-                      <i className={`fa fa-${category?.icon} text-gray-400`}></i>
-                      <span>{task.title}</span>
+                      <i className={`fa fa-${category?.icon} text-${category?.color}-400`}></i>
+                      <span className="font-medium">{task.title}</span>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-1 bg-gray-700 rounded text-sm flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
+                    <span>{statusText}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${
+                      task.difficulty === 'easy' ? 'bg-green-900/50 text-green-300' :
+                      task.difficulty === 'medium' ? 'bg-yellow-900/50 text-yellow-300' :
+                      'bg-red-900/50 text-red-300'
+                    }`}>
+                      {task.difficulty === 'easy' ? '简单' :
+                       task.difficulty === 'medium' ? '中等' : '困难'}
+                    </span>
+                    <span className="px-2 py-0.5 bg-gray-700 rounded-full text-xs flex items-center gap-1">
                       <i className="fa fa-diamond text-blue-400"></i> {task.exp} XP
                     </span>
-                    <span className="px-2 py-1 bg-gray-700 rounded text-sm flex items-center gap-1">
-                      <i className="fa fa-ticket text-yellow-400"></i> {Math.round(task.points)}
-                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 self-end md:self-auto">
+                    <button 
+                      onClick={() => startEditing(task)}
+                      className="text-gray-400 hover:text-blue-400"
+                    >
+                      <i className="fa fa-edit"></i>
+                    </button>
                     <button 
                       onClick={() => deleteTask(task.id)}
                       className="text-gray-400 hover:text-red-400"
@@ -652,7 +910,7 @@ const Achievements = () => {
             onClick={() => setActiveFilter(cat.id)}
             className={`px-3 py-1 rounded text-sm flex items-center gap-1 ${
               activeFilter === cat.id 
-                ? 'bg-purple-600' 
+                ? `bg-${cat.color}-600` 
                 : 'bg-gray-700 hover:bg-gray-600'
             }`}
           >
@@ -831,7 +1089,7 @@ const Stats = () => {
             <div key={cat.id} className="p-4 bg-gray-800 rounded-lg">
               <div className="flex justify-between items-center mb-2">
                 <h4 className="font-medium flex items-center gap-2">
-                  <i className={`fa fa-${cat.icon} text-blue-400`}></i>
+                  <i className={`fa fa-${cat.icon} text-${cat.color}-400`}></i>
                   {cat.name}
                 </h4>
                 <span>{cat.completed}/{cat.total}</span>
@@ -876,7 +1134,7 @@ const Stats = () => {
   );
 };
 
-// 新增：抽奖系统
+// 抽奖系统
 const Lottery = () => {
   const [points, setPoints] = useState(() => {
     return parseInt(localStorage.getItem('lifeGamePoints') || '0');
@@ -1070,7 +1328,7 @@ const Lottery = () => {
   );
 };
 
-// 新增：心愿清单
+// 心愿清单
 const Wishes = () => {
   const [wishes, setWishes] = useState(() => {
     const saved = localStorage.getItem('lifeGameWishes');
@@ -1087,8 +1345,8 @@ const Wishes = () => {
     
     // 计算心愿券数量（从抽奖历史中统计）
     const lotteryHistory = JSON.parse(localStorage.getItem('lifeGameLotteryHistory') || '[]');
-    const tickets = lotteryHistory.filter(item => item.prize.type === 'wish').length;
-    setWishTickets(tickets);
+    const availableTickets = lotteryHistory.filter(item => item.prize.type === 'wish' && item.used !== true).length;
+    setWishTickets(availableTickets);
   }, []);
 
   // 保存心愿到localStorage
@@ -1128,16 +1386,12 @@ const Wishes = () => {
     
     // 减少心愿券数量（更新抽奖历史）
     const lotteryHistory = JSON.parse(localStorage.getItem('lifeGameLotteryHistory') || '[]');
-    // 找到第一个心愿券并移除
-    const updatedHistory = lotteryHistory.filter(item => !(item.prize.type === 'wish' && item.used !== true));
-    if (updatedHistory.length < lotteryHistory.length) {
-      // 标记第一个心愿券为已使用
-      const firstTicketIndex = lotteryHistory.findIndex(item => item.prize.type === 'wish' && item.used !== true);
-      if (firstTicketIndex !== -1) {
-        lotteryHistory[firstTicketIndex].used = true;
-        localStorage.setItem('lifeGameLotteryHistory', JSON.stringify(lotteryHistory));
-        setWishTickets(wishTickets - 1);
-      }
+    // 找到第一个未使用的心愿券并标记为已使用
+    const firstTicketIndex = lotteryHistory.findIndex(item => item.prize.type === 'wish' && item.used !== true);
+    if (firstTicketIndex !== -1) {
+      lotteryHistory[firstTicketIndex].used = true;
+      localStorage.setItem('lifeGameLotteryHistory', JSON.stringify(lotteryHistory));
+      setWishTickets(wishTickets - 1);
     }
   };
 
@@ -1301,6 +1555,15 @@ const Navbar = () => {
   useEffect(() => {
     const savedPoints = localStorage.getItem('lifeGamePoints') || '0';
     setPoints(parseInt(savedPoints));
+    
+    // 监听storage事件，同步其他页面的积分变化
+    const handleStorageChange = () => {
+      const newPoints = localStorage.getItem('lifeGamePoints') || '0';
+      setPoints(parseInt(newPoints));
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   return (

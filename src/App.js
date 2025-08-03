@@ -119,7 +119,8 @@ const Home = () => {
     let updatedTasks = [];
     let pointsToAdd = 0;
     
-    updated (const task of tasks) {
+    // 修复语法错误：将updated改为for
+    for (const task of tasks) {
       if (task.id === id && !task.completed) {
         pointsToAdd = task.points;
         updatedTasks.push({ ...task, completed: true });
@@ -165,7 +166,7 @@ const Home = () => {
     
     // 更新积分
     if (pointsToAdd !== 0) {
-      const currentPoints = parseIntInt(localStorage.getItem('lifeGamePoints') || '0');
+      const currentPoints = parseInt(localStorage.getItem('lifeGamePoints') || '0');
       localStorage.setItem('lifeGamePoints', (currentPoints + pointsToAdd).toString());
     }
   };
@@ -196,7 +197,7 @@ const Home = () => {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold flex items-center">
             <i className="fa fa-calendar-check-o mr-2 text-blue-400"></i>
-            今日任务任务 ({today})
+            今日任务 ({today})
           </h2>
           <div className="flex items-center gap-2">
             <span className="text-gray-300">{todayCompleted}/{todayTasks.length} 完成</span>

@@ -4,7 +4,7 @@ import './index.css';
 import App from './App';
 import { BrowserRouter } from 'react-router-dom';
 
-// 添加错误边界处理Firebase可能的初始化错误
+// 基础错误边界组件（不涉及Firebase相关错误处理）
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -17,7 +17,6 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("应用错误:", error, errorInfo);
-    // 可以在这里添加错误日志上报
   }
 
   render() {
@@ -29,7 +28,7 @@ class ErrorBoundary extends React.Component {
           </div>
           <h2 className="text-2xl font-bold text-red-500 mb-2">加载失败</h2>
           <p className="text-gray-400 mb-6 max-w-md">
-            {this.state.error?.message || "应用加载过程中出现错误，请检查网络连接或稍后再试"}
+            应用加载过程中出现错误，请重试
           </p>
           <button 
             onClick={() => window.location.reload()}

@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/game-life-manager/static/css/main.801ae103.css",
+    "main.css": "/game-life-manager/static/css/main.57083f83.css",
     "main.js": "/game-life-manager/static/js/main.1c6d1f16.js",
     "index.html": "/game-life-manager/index.html",
-    "main.801ae103.css.map": "/game-life-manager/static/css/main.801ae103.css.map",
+    "main.57083f83.css.map": "/game-life-manager/static/css/main.57083f83.css.map",
     "main.1c6d1f16.js.map": "/game-life-manager/static/js/main.1c6d1f16.js.map"
   },
   "entrypoints": [
-    "static/css/main.801ae103.css",
+    "static/css/main.57083f83.css",
     "static/js/main.1c6d1f16.js"
   ]
 }

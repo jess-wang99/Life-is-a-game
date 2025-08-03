@@ -4,15 +4,15 @@ import './index.css';
 import App from './App';
 import { BrowserRouter } from 'react-router-dom';
 
-// 基础错误边界组件（不涉及Firebase相关错误处理）
+// 错误边界组件
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+  static getDerivedStateFromError() {
+    return { hasError: true };
   }
 
   componentDidCatch(error, errorInfo) {
@@ -54,4 +54,3 @@ root.render(
     </ErrorBoundary>
   </React.StrictMode>
 );
-    

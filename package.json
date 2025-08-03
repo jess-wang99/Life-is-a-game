@@ -1,0 +1,7 @@
+"scripts": {
+  "start": "react-scripts start",
+  "build": "react-scripts build",
+  "predeploy": "npm run build",
+  "deploy": "gh-pages -d build"
+},
+"homepage": "https://你的GitHub用户名.github.io/game-life-manager"

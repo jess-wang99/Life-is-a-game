@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
-import Chart from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 import { loadFull } from 'tsparticles';
 import Particles from 'react-tsparticles';
 
@@ -524,7 +524,7 @@ function App() {
           
           {pointHistory.length > 0 ? (
             <div className="h-64">
-              <Chart type="line" data={chartData} />
+              <Line data={chartData} />
             </div>
           ) : (
             <div className="py-8 text-center text-blue-300">

@@ -1,20 +1,20 @@
 {
   "name": "game-life-manager",
   "version": "0.1.0",
-  "homepage": "https://jess-wang99.github.io/game-life-manager",
+  "homepage": "https://你的GitHub用户名.github.io/game-life-manager",
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "chart.js": "^4.4.8",
-    "tsparticles": "^3.3.0",
-    "react-tsparticles": "^2.12.2"
-  }, 
+    "chart.js": "^4.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-tsparticles": "^2.12.2",
+    "tsparticles": "^3.9.0"
+  },
   "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "gh-pages": "^6.3.0",
+    "postcss": "^8.5.6",
     "react-scripts": "5.0.1",
-    "tailwindcss": "^3.4.4",
-    "postcss": "^8.4.38",
-    "autoprefixer": "^10.4.19",
-    "gh-pages": "^6.1.1"
+    "tailwindcss": "^3.4.17"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -27,4 +27,3 @@
     "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
   }
 }
- 

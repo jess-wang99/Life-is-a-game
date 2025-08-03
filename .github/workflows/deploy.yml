@@ -1,29 +1,30 @@
 name: Deploy Game Life Manager
-
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: 拉取代码
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: 安装 Node.js
+      - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: '18.x'
           cache: 'npm'
 
+      - name: 清理缓存
+        run: npm cache clean --force
+
       - name: 安装依赖
-        run: npm ci
+        run: npm install
 
       - name: 构建项目
         run: npm run build
 
-      - name: 部署到 GitHub Pages
+      - name: 部署
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,7 +1,7 @@
 {
   "name": "game-life-manager",
   "version": "0.1.0",
-  "homepage": "https://你的GitHub用户名.github.io/game-life-manager",
+  "homepage": "https://jess-wang99.github.io/game-life-manager",
   "dependencies": {
     "chart.js": "^4.5.0",
     "react": "^18.3.1",

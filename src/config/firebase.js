@@ -1,54 +1,22 @@
-import { db, auth } from '../config/firebase';
-import { ref, onValue, set, update, remove } from "firebase/database";
-import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
-import { getToday } from '../utils';
+// Firebase 配置与初始化
+import { initializeApp } from "firebase/app";
+import { getDatabase } from "firebase/database";
+import { getAuth } from "firebase/auth";
 
-// 用户认证
-export const authenticateUser = (callback) => {
-  // 匿名登录
-  signInAnonymously(auth).catch(error => {
-    console.error("Authentication error:", error);
-  });
-  
-  // 监听用户状态变化
-  return onAuthStateChanged(auth, (user) => {
-    callback(user);
-  });
+// Firebase配置 - 请替换为你自己的Firebase项目配置
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
-// 加载用户任务
-export const loadUserTasks = (userId, callback) => {
-  const tasksRef = ref(db, `users/${userId}/tasks`);
-  return onValue(tasksRef, (snapshot) => {
-    const data = snapshot.val();
-    const tasks = data ? Object.values(data) : [];
-    callback(tasks);
-  });
-};
+// 初始化Firebase
+const app = initializeApp(firebaseConfig);
 
-// 添加新任务
-export const addNewTask = (userId, taskData) => {
-  const taskId = Date.now().toString();
-  const today = getToday();
-  const expMap = { easy: 30, medium: 50, hard: 100 };
-  
-  const newTask = {
-    id: taskId,
-    ...taskData,
-    completed: false,
-    exp: expMap[taskData.difficulty],
-    points: Math.round(expMap[taskData.difficulty] / 3),
-    createdAt: today
-  };
-  
-  const taskRef = ref(db, `users/${userId}/tasks/${taskId}`);
-  return set(taskRef, newTask);
-};
-
-// 更新任务状态
-export const updateTaskStatus = (userId, taskId, completed) => {
-  const taskRef = ref(db, `users/${userId}/tasks/${taskId}`);
-  return update(taskRef, { completed });
-};
-
-// 其他Firebase操作方法...
+// 导出服务
+export const db = getDatabase(app);
+export const auth = getAuth(app);

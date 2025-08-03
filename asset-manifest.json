@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/game-life-manager/static/css/main.fce31ea4.css",
+    "main.js": "/game-life-manager/static/js/main.fbab311b.js",
+    "index.html": "/game-life-manager/index.html",
+    "main.fce31ea4.css.map": "/game-life-manager/static/css/main.fce31ea4.css.map",
+    "main.fbab311b.js.map": "/game-life-manager/static/js/main.fbab311b.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.fce31ea4.css",
+    "static/js/main.fbab311b.js"
+  ]
+}

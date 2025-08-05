@@ -38,7 +38,12 @@ const resetDailyTasks = (tasks) => {
       task.completed && 
       task.lastCompletedDate !== today
     ) {
-      return { ...task, completed: false };
+      return { 
+        ...task, 
+        completed: false,
+        // 保留完成次数统计
+        completionCount: task.completionCount || 0
+      };
     }
     return task;
   });
@@ -139,22 +144,26 @@ const Home = () => {
     let updatedTasks = [];
     let pointsToAdd = 0;
     
-    // 修复语法错误：将updated改为for
     for (const task of tasks) {
       if (task.id === id && !task.completed) {
         pointsToAdd = task.points;
         updatedTasks.push({ 
           ...task, 
           completed: true,
-          lastCompletedDate: getToday() // 记录最后完成日期
+          lastCompletedDate: getToday(), // 记录最后完成日期
+          // 增加完成次数
+          completionCount: (task.completionCount || 0) + 1
         });
       } else if (task.id === id && task.completed) {
         // 取消完成时扣除积分
         pointsToAdd = -task.points;
+        // 减少完成次数（如果有）
+        const newCount = Math.max(0, (task.completionCount || 0) - 1);
         updatedTasks.push({ 
           ...task, 
           completed: false,
-          lastCompletedDate: null
+          lastCompletedDate: null,
+          completionCount: newCount
         });
       } else {
         updatedTasks.push(task);
@@ -263,6 +272,9 @@ const Home = () => {
           <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
             {todayTasks.map(task => {
               const category = TASK_CATEGORIES.find(c => c.id === task.category);
+              // 对重复任务显示完成次数
+              const showCompletionCount = ['daily', 'weekly', 'monthly'].includes(task.repeat);
+              
               return (
                 <div 
                   key={task.id}
@@ -288,6 +300,12 @@ const Home = () => {
                     <div className="flex items-center gap-2">
                       <i className={`fa fa-${category?.icon} text-${category?.color}-400`}></i>
                       <span>{task.title}</span>
+                      {/* 显示完成次数 */}
+                      {showCompletionCount && (
+                        <span className="text-xs px-2 py-0.5 bg-gray-700 rounded-full">
+                          已完成 {task.completionCount || 0} 次
+                        </span>
+                      )}
                     </div>
                   </div>
                   
@@ -389,10 +407,11 @@ const Tasks = () => {
       endDate: taskForm.endDate,
       specificDate: taskForm.specificDate,
       completed: false,
-      lastCompletedDate: null, // 新增：记录最后完成日期
+      lastCompletedDate: null,
       exp: expMap[taskForm.difficulty],
       points: expMap[taskForm.difficulty] / 3, // 积分 = 经验值 / 3
-      createdAt: today
+      createdAt: today,
+      completionCount: 0 // 新增：完成次数统计
     };
     
     setTasks(prev => [...prev, newTask]);
@@ -463,20 +482,23 @@ const Tasks = () => {
   const toggleTask = (id) => {
     setTasks(tasks.map(task => {
       if (task.id === id && !task.completed) {
-        // 完成任务时增加积分
+        // 完成任务时增加积分和完成次数
         addPoints(task.points);
         return { 
           ...task, 
           completed: true,
-          lastCompletedDate: getToday() // 记录最后完成日期
+          lastCompletedDate: getToday(),
+          completionCount: (task.completionCount || 0) + 1
         };
       } else if (task.id === id && task.completed) {
-        // 取消完成时扣除积分
+        // 取消完成时扣除积分和完成次数
         addPoints(-task.points);
+        const newCount = Math.max(0, (task.completionCount || 0) - 1);
         return { 
           ...task, 
           completed: false,
-          lastCompletedDate: null
+          lastCompletedDate: null,
+          completionCount: newCount
         };
       }
       return task;
@@ -707,6 +729,9 @@ const Tasks = () => {
               if (task.repeat === 'once') statusText = `仅在 ${task.specificDate} 执行`;
               if (task.repeat === 'range') statusText = `从 ${task.startDate} 到 ${task.endDate}`;
               
+              // 对重复任务显示完成次数
+              const showCompletionCount = ['daily', 'weekly', 'monthly'].includes(task.repeat);
+              
               return (
                 <div 
                   key={task.id}
@@ -728,6 +753,12 @@ const Tasks = () => {
                     <div className="flex items-center gap-2">
                       <i className={`fa fa-${category?.icon} text-${category?.color}-400`}></i>
                       <span className="font-medium">{task.title}</span>
+                      {/* 显示完成次数 */}
+                      {showCompletionCount && (
+                        <span className="text-xs px-2 py-0.5 bg-gray-700 rounded-full">
+                          已完成 {task.completionCount || 0} 次
+                        </span>
+                      )}
                     </div>
                   </div>
                   
@@ -786,6 +817,19 @@ const Achievements = () => {
   const totalCompleted = tasks.filter(task => task.completed).length;
   const totalCreated = tasks.length;
   
+  // 计算连续完成的任务数（例如连续打卡）
+  const getMaxStreakForTask = (taskId) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || !['daily', 'weekly', 'monthly'].includes(task.repeat)) return 0;
+    return task.completionCount || 0;
+  };
+  
+  // 找出最长连续记录
+  const maxStreak = tasks.reduce((max, task) => {
+    const streak = getMaxStreakForTask(task.id);
+    return Math.max(max, streak);
+  }, 0);
+  
   // 成就数据 - 包含各分类成就
   const achievements = [
     // 通用成就
@@ -820,6 +864,23 @@ const Achievements = () => {
       unlocked: totalCreated >= 50, 
       icon: "list-alt",
       points: 200
+    },
+    // 新增：连续完成成就
+    { 
+      id: 5, 
+      title: "初步坚持", 
+      description: "同一任务连续完成7次", 
+      unlocked: maxStreak >= 7, 
+      icon: "fire",
+      points: 150
+    },
+    { 
+      id: 6, 
+      title: "习惯养成", 
+      description: "同一任务连续完成30次", 
+      unlocked: maxStreak >= 30, 
+      icon: "star",
+      points: 300
     },
     
     // 技能分类成就
@@ -1031,10 +1092,14 @@ const Stats = () => {
   const categoryStats = TASK_CATEGORIES.map(cat => {
     const catTasks = tasks.filter(task => task.category === cat.id);
     const completed = catTasks.filter(task => task.completed).length;
+    // 计算总完成次数（包括重复任务）
+    const totalCompletions = catTasks.reduce((sum, task) => sum + (task.completionCount || 0), 0);
+    
     return {
       ...cat,
       total: catTasks.length,
       completed,
+      totalCompletions,
       rate: catTasks.length > 0 ? Math.round((completed / catTasks.length) * 100) : 0
     };
   });
@@ -1081,6 +1146,11 @@ const Stats = () => {
       }
     ],
   };
+
+  // 找出完成次数最多的任务
+  const topTasks = [...tasks]
+    .sort((a, b) => (b.completionCount || 0) - (a.completionCount || 0))
+    .slice(0, 3);
 
   return (
     <div className="container mx-auto p-6">
@@ -1132,7 +1202,7 @@ const Stats = () => {
                   <i className={`fa fa-${cat.icon} text-${cat.color}-400`}></i>
                   {cat.name}
                 </h4>
-                <span>{cat.completed}/{cat.total}</span>
+                <span>总完成: {cat.totalCompletions} 次</span>
               </div>
               <div className="h-2 bg-gray-700 rounded-full">
                 <div 
@@ -1144,11 +1214,46 @@ const Stats = () => {
                   }}
                 ></div>
               </div>
-              <div className="mt-2 text-right text-sm text-gray-400">{cat.rate}% 完成率</div>
+              <div className="mt-2 text-right text-sm text-gray-400">
+                {cat.completed}/{cat.total} 任务完成 ({cat.rate}%)
+              </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* 完成次数最多的任务 */}
+      {topTasks.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold mb-4">坚持最久的任务</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {topTasks.map((task, index) => {
+              const category = TASK_CATEGORIES.find(c => c.id === task.category);
+              return (
+                <div key={task.id} className="p-4 bg-gray-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                      index === 0 ? 'bg-yellow-500' : 
+                      index === 1 ? 'bg-gray-400' : 
+                      'bg-amber-700'
+                    }`}>
+                      <span className="text-xs font-bold">{index + 1}</span>
+                    </div>
+                    <i className={`fa fa-${category?.icon} text-${category?.color}-400`}></i>
+                    <span className="font-medium">{task.title}</span>
+                  </div>
+                  <div className="text-2xl font-bold text-center text-blue-400 mb-1">
+                    {task.completionCount || 0} 次
+                  </div>
+                  <div className="text-center text-xs text-gray-400">
+                    连续完成记录
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="bg-gray-800 p-6 rounded-lg">
         <h3 className="text-xl font-semibold mb-4">最近7天完成情况</h3>
